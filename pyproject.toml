@@ -1,0 +1,11 @@
+[project]
+name = "fly_in"
+version = "0.0.1"
+description = "tlaranje's fly-in project (school 42)"
+requires-python = ">=3.10"
+dependencies = [
+    "flake8>=7.3.0",
+    "mypy>=1.19.1",
+    "pydantic>=2.12.5",
+    "rich>=13.7.0"
+]
