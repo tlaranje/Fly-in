@@ -6,7 +6,7 @@
 #    By: tlaranje <tlaranje@student.42porto.com>    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/03/20 14:50:51 by tlaranje          #+#    #+#              #
-#    Updated: 2026/03/20 15:16:33 by tlaranje         ###   ########.fr        #
+#    Updated: 2026/03/23 12:17:12 by tlaranje         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -22,7 +22,7 @@ install:
 	@clear && uv sync
 
 run:
-	@clear && uv run python -m src
+	@clear && uv run python -m src $(ARGS)
 
 debug:
 	@clear && uv run python -m pdb -m src
