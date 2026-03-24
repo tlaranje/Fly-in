@@ -1,10 +1,10 @@
-from src.Parsing.parse_maps import MapParser
-from src.Parsing.validators import DroneMap
-from src.Graph.graph import Graph
-from src.Graph.pathfinder import PathFinder
+from src.Simulation import Simulation, Visualizer
+from src.Parsing import MapParser, DroneMap
 from pydantic import ValidationError
+from src.Graph import Graph
 from rich import print
 import sys
+import traceback
 
 
 def main() -> None:
@@ -12,15 +12,16 @@ def main() -> None:
         map_parser = MapParser(sys.argv[1])
         drone_map: DroneMap = map_parser.parse()
         graph = Graph(drone_map)
-        path_finder = PathFinder(graph, drone_map)
-        shortest_path = path_finder.find_shortest_path()
-        print(shortest_path)
+        v = Visualizer(graph)
+        s = Simulation(graph, v)
+        s.run()
     except ValidationError as e:
         for error in e.errors():
             msg = error['msg'].removeprefix("Value error, ")
             print(f"[bold red]{msg}[/bold red]")
-    except Exception as e:
-        print(f"[bold red]{e}[/bold red]")
+    except Exception:
+        print("[bold red]Erro inesperado:[/bold red]")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

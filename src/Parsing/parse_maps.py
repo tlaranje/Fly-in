@@ -13,9 +13,10 @@ class MapParser:
 
         temp_data: list[str] = data.split(' ')
         metadata: dict[str, Any] = {}
-
         for d in temp_data:
-            if '=' in d:
+            if d.endswith("rainbow"):
+                metadata[d.split('=')[0]] = "white"
+            elif '=' in d:
                 metadata[d.split('=')[0]] = d.split('=')[1]
 
         return metadata
@@ -39,12 +40,12 @@ class MapParser:
                     map_data["nb_drones"] = int(line.split(':')[1].strip())
                 if "hub" in line:
                     pattern = re.compile(r"""
-                        ^\w+:            # line starts with zone type prefix
-                        \s+(\S+)\s+      # whitespace + zone name + whitespace
-                        (\d+)\s+(\d+)    # x + whitespace + y
-                        (?:              # optional metadata block
-                            \s+\[        # whitespace + opening bracket
-                            ([^\]]*)\]   # metadata content + closing bracket
+                        ^\w+:             # line starts with zone type prefix
+                        \s+(\S+)\s+       # whitespace + zone name + whitespace
+                        (-?\d+)\s+(-?\d+) # x + whitespace + y
+                        (?:               # optional metadata block
+                            \s+\[         # whitespace + opening bracket
+                            ([^\]]*)\]    # metadata content + closing bracket
                         )?
                     """, re.VERBOSE)
 
@@ -91,9 +92,9 @@ class MapParser:
                     c = Connection(
                         zone1=zone1, zone2=zone2,
                         **({} if not meta else {
-                                'max_link_capacity': meta.get(
+                                'max_link_capacity': int(meta.get(
                                     'max_link_capacity', 1
-                                )
+                                ))
                         })
                     )
                     map_data["connections"].append(c)

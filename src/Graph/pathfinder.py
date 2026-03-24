@@ -1,6 +1,6 @@
 from collections import deque
-from src.Parsing.validators import DroneMap
-from src.Graph.graph import Graph
+from src.Parsing import DroneMap
+from src.Graph import Graph
 
 
 class PathFinder:

@@ -6,7 +6,7 @@
 #    By: tlaranje <tlaranje@student.42porto.com>    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/03/20 14:50:51 by tlaranje          #+#    #+#              #
-#    Updated: 2026/03/23 12:17:12 by tlaranje         ###   ########.fr        #
+#    Updated: 2026/03/24 12:19:35 by tlaranje         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -14,8 +14,8 @@
 # === VARIABLES ===
 
 # === COMMANDS ===
-RM              := rm -rf
-FIND            := find
+RM		:= rm -rf
+FIND	:= find
 
 # === BUILD TARGETS ===
 install:
