@@ -10,7 +10,6 @@ class MapParser:
     def parse_metadata(self, data: str) -> dict[str, Any]:
         if data is None:
             return {}
-
         temp_data: list[str] = data.split(' ')
         metadata: dict[str, Any] = {}
         for d in temp_data:

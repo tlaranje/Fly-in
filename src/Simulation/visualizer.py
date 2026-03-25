@@ -1,6 +1,7 @@
 from src.Simulation.drone import Drone
 from src.Graph import Graph
 import tkinter as tk
+import random
 
 
 class Visualizer:
@@ -32,6 +33,7 @@ class Visualizer:
             self.root, text="Turn 0", font=("Arial", 20, "bold"), bg="grey"
         )
         self.title_label.pack(before=self.canvas)
+        self.turn_count = 0
 
     def draw_zones(self) -> None:
         for zone in self.graph.zones.values():
@@ -59,6 +61,7 @@ class Visualizer:
         pass
 
     def draw_drones(self) -> list[Drone]:
+        colors = ["cyan", "lime"]
         drones: list[Drone] = []
         z = self.graph.zones["start"]
         i = 0
@@ -66,17 +69,15 @@ class Visualizer:
         cy = (z.y - self.min_y) * self.scale + self.margin
 
         while i < self.map_data.nb_drones:
-            if z.count_drones == z.max_drones:
-                break
             rect_id = self.canvas.create_rectangle(
                 cx - 10, cy - 10,
                 cx + 10, cy + 10,
-                fill="cyan"
+                fill=random.choice(colors)
             )
             d = Drone(i, z.name)
             d.canva_id = rect_id
+            d.current_zone = z.name
             drones.append(d)
-            z.count_drones += 1
             i += 1
         return drones
 

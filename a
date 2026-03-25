@@ -1,0 +1,34 @@
+def move_drones(self, drones: list[Drone]) -> None:
+        zone = self.graph.zones
+        conn = self.graph.all_connections
+        v = self.visualizer
+        size = 10
+        link_usage = self.link_usage
+
+        for d in drones[:]:
+            d.path = self.path_finder.find_shortest_path()
+            if d.current_zone == "goal":
+                self.visualizer.canvas.delete(d.canva_id)
+                zone[d.current_zone].count_drones -= 1
+                self.drones.remove(d)
+                continue
+            for c, cap in conn[d.current_zone]:
+                link = tuple(sorted((d.current_zone, c)))
+                if self.link_usage.get(link, 0) >= cap:
+                    continue
+                if zone[c].count_drones < zone[c].max_drones:
+                    if d.current_zone != "goal":
+                        cx = (zone[c].x - v.min_x) * v.scale + v.margin
+                        cy = (zone[c].y - v.min_y) * v.scale + v.margin
+                        v.canvas.coords(
+                            d.canva_id,
+                            cx - size, cy - size,
+                            cx + size, cy + size
+                        )
+                        link_usage[link] = link_usage.get(link, 0) + 1
+
+                        zone[d.current_zone].count_drones -= 1
+                        zone[c].count_drones += 1
+
+                        d.current_zone = zone[c].name
+                        break
