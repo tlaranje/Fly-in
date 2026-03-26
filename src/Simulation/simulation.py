@@ -14,13 +14,12 @@ class Simulation:
         self.turns: list[str] = []
         self.link_usage: dict = {}
         self.path_finder = path_finder
-
-    def on_key_n(self, event):
-        self.move_drones(self.drones)
+        self.turn_in_progress = False
+        self.manual_mode = True
 
     def set_drone_path(self, drones: list[Drone]) -> None:
         for d in drones:
-            d.path = self.path_finder.find_shortest_path()
+            d.path = self.path_finder.find_best_path()
             d.path.remove("start")
 
     def animate_drone(
@@ -90,38 +89,63 @@ class Simulation:
                     else:
                         self.animate_drone(d, cx, cy)
 
-    def all_delivered(self) -> bool:
-        return len(self.drones) == 0
-
-    def step(self) -> None:
-        vis = self.visualizer
-        if len(self.drones) == 0:
-            return
-
-        self.move_drones(self.drones)
-        self.link_usage = {}
-
-        vis.turn_count += 1
-        vis.title_label.config(text=f"Turn {vis.turn_count}")
-
-        self.wait_for_animations()
-
     def wait_for_animations(self) -> None:
         any_moving = any(getattr(d, 'is_moving', False) for d in self.drones)
 
         if any_moving:
             self.visualizer.root.after(16, self.wait_for_animations)
         else:
-            if not self.all_delivered():
-                self.visualizer.root.after(500, self.step)
+            self.turn_in_progress = False
+            if not len(self.drones) == 0:
+                if not self.manual_mode:
+                    self.visualizer.root.after(
+                        500, lambda: self.on_key_n(None)
+                    )
             else:
                 return
 
-    def run(self) -> None:
-        self.visualizer.draw_connections()
-        self.visualizer.draw_zones()
+    def on_key_n(self, event):
+        if self.turn_in_progress:
+            return
 
-        self.drones += self.visualizer.draw_drones()
+        self.turn_in_progress = True
+        vis = self.visualizer
+
+        self.link_usage = {}
+
+        vis.turn_count += 1
+        vis.title_label.config(text=f"Turn {vis.turn_count}")
+
+        self.move_drones(self.drones)
+
+        self.wait_for_animations()
+
+    def toggle_mode(self, event):
+        self.manual_mode = not self.manual_mode
+
+        if not self.manual_mode and not self.turn_in_progress:
+            self.on_key_n(None)
+
+    def step(self) -> None:
+        v = self.visualizer
+
+        if len(self.drones) == 0:
+            return
+
+        v.root.bind("m", self.toggle_mode)
+        v.root.bind("n", self.on_key_n)
+
+        self.link_usage = {}
+
+        self.wait_for_animations()
+
+    def run(self) -> None:
+        v = self.visualizer
+
+        v.draw_connections()
+        v.draw_zones()
+
+        self.drones += v.draw_drones()
         self.set_drone_path(self.drones)
-        self.visualizer.root.after(500, self.step)
-        self.visualizer.root.mainloop()
+        v.root.after(500, self.step)
+        v.root.mainloop()
