@@ -6,3 +6,4 @@ class Drone:
         self.canva_id: int = 0
         self.path: list[str] = []
         self.delivered = False
+        self.is_moving = False

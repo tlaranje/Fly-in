@@ -61,7 +61,11 @@ class Visualizer:
         pass
 
     def draw_drones(self) -> list[Drone]:
-        colors = ["cyan", "lime"]
+        colors = [
+            "cyan", "lime", "orange", "yellow",
+            "magenta", "blue", "green", "pink", "white",
+            "coral", "turquoise", "gold", "violet", "salmon"
+        ]
         drones: list[Drone] = []
         z = self.graph.zones["start"]
         i = 0
