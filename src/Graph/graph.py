@@ -1,13 +1,15 @@
 from src.Parsing import DroneMap, Zone
 from rich import print
+from typing import Callable
 
 
 class Graph:
-    def __init__(self, map_data: DroneMap) -> None:
+    def __init__(self, map_data: DroneMap, main: Callable) -> None:
         self.map_data = map_data
         self.zones: dict[str, Zone] = {}
         self.all_connections: dict[str, list[tuple[str, int]]] = {}
         self.build(map_data)
+        self.main = main
 
     def build(self, map_data: DroneMap) -> None:
         self.add_zones(map_data)

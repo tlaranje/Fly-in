@@ -11,12 +11,12 @@ def main() -> None:
     try:
         map_parser = MapParser(sys.argv[1])
         drone_map: DroneMap = map_parser.parse()
-        graph = Graph(drone_map)
+        graph = Graph(drone_map, main)
         v = Visualizer(graph)
         p = PathFinder(graph, drone_map)
         p.find_alternative_path()
-        # s = Simulation(graph, v, p)
-        # s.run()
+        s = Simulation(graph, v, p)
+        s.run()
     except ValidationError as e:
         for error in e.errors():
             msg = error['msg'].removeprefix("Value error, ")

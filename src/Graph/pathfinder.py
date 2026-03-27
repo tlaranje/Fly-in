@@ -1,7 +1,6 @@
 from src.Parsing import DroneMap
 from src.Graph import Graph
 import heapq
-from rich import print
 
 
 class PathFinder:
@@ -9,35 +8,39 @@ class PathFinder:
         self.graph = graph
         self.start = map_data.start_hub.name
         self.end = map_data.end_hub.name
-    """
-    - identificar zonas críticas
-    - ordená‑las por capacidade
-    - penalizar uma zona de cada vez
-    - gerar um novo caminho
-    - parar quando o caminho for diferente
-    - Agora quero que tu próprio dês o primeiro passo.
-    """
 
-    def find_alternative_path(self) -> None:
+    def find_alternative_path(self) -> list[str]:
         zone = self.graph.zones
-        path: list[str] = self.find_best_path()
-        cri_zones: list[tuple[str, int]] = sorted([
-            (zone[z].name, zone[z].max_drones) for z in path[1:-1]
-        ], key=lambda x: x[1])
-        print(cri_zones)
+        path1: list[str] = self.find_best_path()
+        cri_zones = sorted(
+            [(z, zone[z].max_drones) for z in path1[1:-1]],
+            key=lambda x: x[1]
+        )
 
-    def find_best_path(self, penalized_zones=None) -> list[str]:
+        for name, cap in cri_zones:
+            path2 = self.find_best_path(p_zones=[name])
+            if path2 != path1:
+                return path2
+        return path1
+
+    def find_best_path(self, start_zone=None, p_zones=None) -> list[str]:
         dist: dict[str, float] = {}
-        prev: dict[str, str | None] = {}
+        prev: dict[str, str] = {}
         pq: list[tuple[float, str]] = []
         path: list[str] = []
         penalty = 100
 
-        prev = {zone: None for zone in self.graph.zones}
-        dist = {zone: float("inf") for zone in self.graph.zones}
-        dist[self.start] = 0
+        if start_zone is None:
+            start = self.start
+        else:
+            start = start_zone
 
-        heapq.heappush(pq, (0, self.start))
+        prev = {zone: "" for zone in self.graph.zones}
+
+        dist = {zone: float("inf") for zone in self.graph.zones}
+        dist[start] = 0
+
+        heapq.heappush(pq, (0, start))
         while pq:
             cost, curr_zone = heapq.heappop(pq)
 
@@ -51,7 +54,7 @@ class PathFinder:
                     continue
 
                 move_cost = 2 if zone.zone_type == "restricted" else 1
-                if penalized_zones and z in penalized_zones:
+                if p_zones and z in p_zones:
                     move_cost += penalty
 
                 new_cost = cost + move_cost
@@ -60,9 +63,10 @@ class PathFinder:
                     dist[z] = new_cost
                     prev[z] = curr_zone
                     heapq.heappush(pq, (new_cost, z))
-        nz: str | None = self.end
-        while nz is not None:
+        nz = self.end
+        while nz is not None and nz != start:
             path.append(nz)
             nz = prev[nz]
+        path.append(start)
         path.reverse()
         return path

@@ -10,6 +10,7 @@ class Zone(BaseModel):
     color: Optional[str] = None
     max_drones: int = 1
     count_drones: int = 0
+    canva_id: int = 0
 
     @model_validator(mode="before")
     @classmethod

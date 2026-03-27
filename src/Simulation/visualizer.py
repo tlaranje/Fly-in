@@ -39,12 +39,19 @@ class Visualizer:
         for zone in self.graph.zones.values():
             cx = (zone.x - self.min_x) * self.scale + self.margin
             cy = (zone.y - self.min_y) * self.scale + self.margin
-            self.canvas.create_rectangle(
+
+            rec_id = self.canvas.create_rectangle(
                 cx - 16, cy - 16,
                 cx + 16, cy + 16,
                 fill=zone.color or "black"
             )
-        pass
+            self.canvas.create_text(
+                cx, cy,
+                font=("Arial", 13, "bold"),
+                text=zone.zone_type[0].upper(),
+                fill="lime"
+            )
+            zone.canva_id = rec_id
 
     def draw_connections(self) -> None:
         for zone1, n in self.graph.all_connections.items():
