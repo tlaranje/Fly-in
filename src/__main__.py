@@ -9,6 +9,7 @@ import traceback
 
 def main() -> None:
     try:
+        print
         map_parser = MapParser(sys.argv[1])
         drone_map: DroneMap = map_parser.parse()
         graph = Graph(drone_map, main)

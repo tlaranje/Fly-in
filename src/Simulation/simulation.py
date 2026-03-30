@@ -131,9 +131,15 @@ class Simulation:
 
             if self.link_usage.get(link, 0) >= cap or \
                zone[next_zone].count_drones >= zone[next_zone].max_drones:
+                zone_counts = {
+                    name: z.count_drones
+                    for name, z in self.graph.zones.items()
+                }
                 new_path = self.path_finder.find_best_path(
                     p_zones=[next_zone],
-                    start_zone=d.current_zone
+                    start_zone=d.current_zone,
+                    zone_counts=zone_counts,
+                    link_usage=self.link_usage
                 )
 
                 if new_path and new_path[0] == d.current_zone:

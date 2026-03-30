@@ -23,7 +23,9 @@ class PathFinder:
                 return path2
         return path1
 
-    def find_best_path(self, start_zone=None, p_zones=None) -> list[str]:
+    def find_best_path(
+        self, start_zone=None, p_zones=None, zone_counts=None, link_usage=None
+    ) -> list[str]:
         dist: dict[str, float] = {}
         prev: dict[str, str] = {}
         pq: list[tuple[float, str]] = []
@@ -49,11 +51,16 @@ class PathFinder:
 
             for z, _ in self.graph.all_connections[curr_zone]:
                 zone = self.graph.zones[z]
+                move_cost = 2 if zone.zone_type == "restricted" else 1
+
+                if zone_counts and zone_counts.get(z, 0) >= zone.max_drones:
+                    move_cost += penalty
+                if p_zones and z in p_zones:
+                    move_cost += penalty
 
                 if zone.zone_type == "blocked":
                     continue
 
-                move_cost = 2 if zone.zone_type == "restricted" else 1
                 if p_zones and z in p_zones:
                     move_cost += penalty
 
