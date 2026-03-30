@@ -38,7 +38,7 @@ class Simulation:
         step = 5
 
         if distance <= step:
-            self.visualizer.canvas.move(drone.canva_id, dx, dy)
+            self.visualizer.canvas.move(drone.drone_tag, dx, dy)
             drone.is_moving = False
             if on_complete:
                 on_complete()
@@ -46,7 +46,7 @@ class Simulation:
 
         move_x = dx / distance * step
         move_y = dy / distance * step
-        self.visualizer.canvas.move(drone.canva_id, move_x, move_y)
+        self.visualizer.canvas.move(drone.drone_tag, move_x, move_y)
         self.visualizer.root.after(
             16, lambda: self.animate_drone(drone, x, y, on_complete)
         )
@@ -63,13 +63,22 @@ class Simulation:
             assert d.current_zone is not None
 
             next_zone = d.path[0]
-            if zone[next_zone].zone_type == "restricted":
-                d.wait_turns = getattr(d, "wait_turns", 0) + 1
+
+            if zone[next_zone].zone_type != "restricted":
+                d.wait_turns = 0
+                d.wait_target = None
+            else:
+                if d.wait_target != next_zone:
+                    d.wait_target = next_zone
+                    d.wait_turns = 0
+
+                d.wait_turns += 1
 
                 if d.wait_turns < 2:
                     continue
 
                 d.wait_turns = 0
+                d.wait_target = None
 
             cap = next(
                 (c for z, c in conns[d.current_zone] if z == next_zone), 1
@@ -80,7 +89,7 @@ class Simulation:
                zone[next_zone].count_drones >= zone[next_zone].max_drones:
                 continue
 
-            if d.current_zone != "goal":
+            if d.current_zone != self.graph.map_data.end_hub.name:
                 cx = (zone[next_zone].x - v.min_x) * v.scale + v.margin
                 cy = (zone[next_zone].y - v.min_y) * v.scale + v.margin
 
@@ -91,7 +100,7 @@ class Simulation:
                 d.path.remove(next_zone)
                 d.is_moving = True
 
-                if d.current_zone in ["goal", "impossible_goal"]:
+                if d.current_zone == self.graph.map_data.end_hub.name:
                     zone[d.current_zone].count_drones -= 1
 
                     def on_arrive(drone=d):
@@ -112,7 +121,7 @@ class Simulation:
             if not len(self.drones) == 0:
                 if not self.manual_mode:
                     self.visualizer.root.after(
-                        500, lambda: self.on_key_n(None)
+                        250, lambda: self.on_key_n(None)
                     )
             else:
                 return

@@ -1,7 +1,6 @@
 from src.Simulation.drone import Drone
 from src.Graph import Graph
 import tkinter as tk
-import random
 
 
 class Visualizer:
@@ -44,7 +43,7 @@ class Visualizer:
             cx = (zone.x - self.min_x) * self.scale + self.margin
             cy = (zone.y - self.min_y) * self.scale + self.margin
 
-            rec_id = self.canvas.create_rectangle(
+            rec_id = self.canvas.create_oval(
                 cx - 16, cy - 16,
                 cx + 16, cy + 16,
                 fill=zone.color or "grey"
@@ -73,9 +72,8 @@ class Visualizer:
 
     def draw_drones(self) -> list[Drone]:
         colors = [
-            "cyan", "lime", "orange", "yellow",
-            "magenta", "blue", "green", "pink", "white",
-            "coral", "turquoise", "gold", "violet", "salmon"
+            "cyan", "lime", "magenta", "blue", "pink",
+            "white", "coral", "turquoise", "salmon"
         ]
         drones: list[Drone] = []
         z = self.graph.zones["start"]
@@ -84,16 +82,44 @@ class Visualizer:
         cy = (z.y - self.min_y) * self.scale + self.margin
 
         while i < self.map_data.nb_drones:
-            rect_id = self.canvas.create_rectangle(
-                cx - 10, cy - 10,
-                cx + 10, cy + 10,
-                fill=random.choice(colors)
+            tag = f"drone_{i}"
+            color = colors[i % len(colors)]
+
+            radius_big = 10
+            circle_id = self.canvas.create_oval(
+                cx - radius_big, cy - radius_big,
+                cx + radius_big, cy + radius_big,
+                fill=color,
+                tags=tag
             )
+            offset = 2
+            x1, y1, x2, y2 = self.canvas.coords(circle_id)
+            x1 += offset
+            x2 -= offset
+            y1 += offset
+            y2 -= offset
+            corners = [
+                (x1, y1),
+                (x2, y1),
+                (x1, y2),
+                (x2, y2)
+            ]
+
+            radius_small = 5
+            for j, (ccx, ccy) in enumerate(corners):
+                self.canvas.create_oval(
+                    ccx - radius_small, ccy - radius_small,
+                    ccx + radius_small, ccy + radius_small,
+                    fill=color,
+                    tags=tag
+                )
             d = Drone(i, z.name)
-            d.canva_id = rect_id
+            d.drone_tag = tag
+            d.canva_id = circle_id
             d.current_zone = z.name
             drones.append(d)
             i += 1
+
         return drones
 
     def run(self) -> None:

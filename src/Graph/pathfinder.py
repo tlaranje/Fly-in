@@ -54,7 +54,7 @@ class PathFinder:
 
             for z, _ in self.graph.all_connections[curr_zone]:
                 zone = self.graph.zones[z]
-                move_cost = 1.2 if zone.zone_type == "restricted" else 1
+                move_cost = 2 if zone.zone_type == "restricted" else 1
 
                 if zone_counts and zone_counts.get(z, 0) >= zone.max_drones:
                     move_cost += penalty
