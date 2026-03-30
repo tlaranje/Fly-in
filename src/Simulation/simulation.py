@@ -1,7 +1,6 @@
 from src.Simulation.visualizer import Visualizer
 from src.Simulation.drone import Drone
 from src.Graph import Graph, PathFinder
-from rich import print
 
 
 class Simulation:
@@ -17,11 +16,11 @@ class Simulation:
         self.path_finder = path_finder
         self.turn_in_progress = False
         self.manual_mode = True
+        self.paths: list[list[str]] = [[]]
 
-    def set_drone_path(self, drones: list[Drone]) -> None:
-        for d in drones:
-            d.path = self.path_finder.find_alternative_path()
-            d.path.remove("start")
+    def set_drones_paths(self) -> None:
+        for i, d in enumerate(self.drones):
+            d.path = list(self.paths[i % len(self.paths)])
 
     def animate_drone(
             self, drone: Drone, x: float, y: float, on_complete=None
@@ -79,20 +78,6 @@ class Simulation:
 
             if self.link_usage.get(link, 0) >= cap or \
                zone[next_zone].count_drones >= zone[next_zone].max_drones:
-                zone_counts = {
-                    name: z.count_drones
-                    for name, z in self.graph.zones.items()
-                }
-                new_path = self.path_finder.find_best_path(
-                    p_zones=[next_zone],
-                    start_zone=d.current_zone,
-                    zone_counts=zone_counts
-                )
-
-                if new_path and new_path[0] == d.current_zone:
-                    new_path = new_path[1:]
-
-                d.path = new_path
                 continue
 
             if d.current_zone != "goal":
@@ -104,7 +89,6 @@ class Simulation:
                 zone[next_zone].count_drones += 1
                 d.current_zone = zone[next_zone].name
                 d.path.remove(next_zone)
-
                 d.is_moving = True
 
                 if d.current_zone in ["goal", "impossible_goal"]:
@@ -146,16 +130,6 @@ class Simulation:
         vis.title_label.config(text=f"Turn {vis.turn_count}")
 
         self.move_drones(self.drones)
-        for d in self.drones:
-            if d.blocked and d.current_zone is not None:
-                new_path = self.path_finder.find_best_path(
-                    p_zones=[d.blocked_next],
-                    start_zone=d.current_zone
-                )
-                if new_path and new_path[0] == d.current_zone:
-                    new_path = new_path[1:]
-                d.path = new_path
-                d.blocked = False
         self.wait_for_animations()
 
     def toggle_mode(self, event):
@@ -192,7 +166,8 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.set_drone_path(self.drones)
+        self.paths = self.path_finder.find_k_paths()
+        self.set_drones_paths()
 
     def run(self) -> None:
         v = self.visualizer
@@ -205,6 +180,8 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.set_drone_path(self.drones)
+        self.paths = self.path_finder.find_k_paths(k=3)
+        self.set_drones_paths()
+
         v.root.after(500, self.step)
         v.root.mainloop()

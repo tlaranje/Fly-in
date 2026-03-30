@@ -16,21 +16,25 @@ class Visualizer:
         self.min_y = min(zone.y for zone in graph.zones.values())
         self.max_x = max(zone.x for zone in graph.zones.values())
         self.max_y = max(zone.y for zone in graph.zones.values())
-        width = (self.max_x - self.min_x) * self.scale + self.margin * 2
-        height = (self.max_y - self.min_y) * self.scale + self.margin * 2
+        self.width = (self.max_x - self.min_x) * self.scale + self.margin * 2
+        self.height = (self.max_y - self.min_y) * self.scale + self.margin * 2
+        self.background_color = "#2b2b2b"
         self.canvas = tk.Canvas(
             self.root,
-            width=width,
-            height=height,
-            bg="grey",
+            width=self.width,
+            height=self.height,
+            bg=self.background_color,
             highlightthickness=0
         )
         self.canvas.pack()
 
-        self.root.configure(bg="grey")
+        self.root.configure(bg=self.background_color)
 
         self.title_label = tk.Label(
-            self.root, text="Turn 0", font=("Arial", 20, "bold"), bg="grey"
+            self.root,
+            text="Turn 0",
+            font=("TkHeadingFont", 23, "bold"),
+            bg=self.background_color
         )
         self.title_label.pack(before=self.canvas)
         self.turn_count = 0
@@ -43,13 +47,13 @@ class Visualizer:
             rec_id = self.canvas.create_rectangle(
                 cx - 16, cy - 16,
                 cx + 16, cy + 16,
-                fill=zone.color or "black"
+                fill=zone.color or "grey"
             )
             self.canvas.create_text(
                 cx, cy,
-                font=("Arial", 13, "bold"),
+                font=("TkHeadingFont", 13, "bold"),
                 text=zone.zone_type[0].upper(),
-                fill="lime"
+                fill="white"
             )
             zone.canva_id = rec_id
 
@@ -93,6 +97,6 @@ class Visualizer:
         return drones
 
     def run(self) -> None:
-        self.draw_connections()
         self.draw_zones()
+        self.draw_connections()
         self.root.mainloop()

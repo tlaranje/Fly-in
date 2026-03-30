@@ -10,3 +10,4 @@ class Drone:
         self.blocked = False
         self.wait_turns = 0
         self.prev_zone: str = ""
+        self.blocked_turns: int = 0

@@ -14,7 +14,7 @@ class MapParser:
         metadata: dict[str, Any] = {}
         for d in temp_data:
             if d.endswith("rainbow"):
-                metadata[d.split('=')[0]] = "white"
+                metadata[d.split('=')[0]] = "green"
             elif '=' in d:
                 metadata[d.split('=')[0]] = d.split('=')[1]
 

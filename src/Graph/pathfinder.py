@@ -9,19 +9,22 @@ class PathFinder:
         self.start = map_data.start_hub.name
         self.end = map_data.end_hub.name
 
-    def find_alternative_path(self) -> list[str]:
-        zone = self.graph.zones
-        path1: list[str] = self.find_best_path()
-        cri_zones = sorted(
-            [(z, zone[z].max_drones) for z in path1[1:-1]],
-            key=lambda x: x[1]
-        )
+    def find_k_paths(self, k=3) -> list[list[str]]:
+        paths = []
+        zone_penalty: dict[str, int] = {}
 
-        for name, cap in cri_zones:
-            path2 = self.find_best_path(p_zones=[name])
-            if path2 != path1:
-                return path2
-        return path1
+        for _ in range(k):
+            path = self.find_best_path(zone_counts=zone_penalty)
+
+            if not path or path in paths:
+                break
+
+            paths.append(path)
+
+            for z in path[1:-1]:
+                zone_penalty[z] = zone_penalty.get(z, 0) + 2
+
+        return paths
 
     def find_best_path(
         self, start_zone=None, p_zones=None, zone_counts=None
@@ -30,7 +33,7 @@ class PathFinder:
         prev: dict[str, str] = {}
         pq: list[tuple[float, str]] = []
         path: list[str] = []
-        penalty = 100
+        penalty = 5
 
         if start_zone is None:
             start = self.start
@@ -51,11 +54,9 @@ class PathFinder:
 
             for z, _ in self.graph.all_connections[curr_zone]:
                 zone = self.graph.zones[z]
-                move_cost = 2 if zone.zone_type == "restricted" else 1
+                move_cost = 1.2 if zone.zone_type == "restricted" else 1
 
                 if zone_counts and zone_counts.get(z, 0) >= zone.max_drones:
-                    move_cost += penalty
-                if p_zones and z in p_zones:
                     move_cost += penalty
 
                 if zone.zone_type == "blocked":

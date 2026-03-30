@@ -15,7 +15,6 @@ def main() -> None:
         graph = Graph(drone_map, main)
         v = Visualizer(graph)
         p = PathFinder(graph, drone_map)
-        p.find_alternative_path()
         s = Simulation(graph, v, p)
         s.run()
     except ValidationError as e:
