@@ -1,14 +1,7 @@
 from src.Simulation.visualizer import Visualizer
 from src.Simulation.drone import Drone
 from src.Graph import Graph, PathFinder
-from dataclasses import dataclass
 from rich import print
-
-
-@dataclass
-class Position:
-    x: float
-    y: float
 
 
 class Simulation:
@@ -59,24 +52,6 @@ class Simulation:
             16, lambda: self.animate_drone(drone, x, y, on_complete)
         )
 
-    def coodrs(
-            self, curr_zone: str, next_zone: str
-    ) -> tuple[Position, Position, Position]:
-        zone = self.graph.zones
-
-        def get_coords(zone_name: str) -> Position:
-            coords = self.visualizer.canvas.coords(zone[zone_name].canva_id)
-            x = (coords[0] + coords[2]) / 2
-            y = (coords[1] + coords[3]) / 2
-            return Position(x, y)
-
-        curr_pos = get_coords(curr_zone)
-        next_pos = get_coords(next_zone)
-        cx = (next_pos.x + curr_pos.x) / 2
-        cy = (next_pos.y + curr_pos.y) / 2
-        center_pos = Position(cx, cy)
-        return (curr_pos, center_pos, next_pos)
-
     def move_drones(self, drones: list[Drone]) -> None:
         zone = self.graph.zones
         conns = self.graph.all_connections
@@ -85,44 +60,17 @@ class Simulation:
         for d in drones[:]:
             if getattr(d, 'is_moving', False) or len(d.path) == 0:
                 continue
-            if d.in_transit:
-                d.transit_remaining -= 1
 
-                if d.transit_remaining == 1:
-                    continue
-
-                if d.transit_remaining == 0:
-                    tx, ty = d.transit_target_coords
-                    d.is_moving = True
-
-                    def on_arrive(drone=d):
-                        drone.in_transit = False
-                        drone.current_zone = drone.transit_target
-                        zone[drone.current_zone].count_drones += 1
-                    d.current_zone = d.transit_target
-
-                    self.animate_drone(d, tx, ty, on_complete=on_arrive)
-                    continue
             assert d.current_zone is not None
 
             next_zone = d.path[0]
             if zone[next_zone].zone_type == "restricted":
-                coords = self.coodrs(d.current_zone, next_zone)
-                curr_pos, center_pos, next_pos = coords
+                d.wait_turns = getattr(d, "wait_turns", 0) + 1
 
-                zone[d.current_zone].count_drones -= 1
+                if d.wait_turns < 2:
+                    continue
 
-                d.in_transit = True
-                d.transit_remaining = 2
-                d.transit_target = next_zone
-                d.transit_target_coords = (next_pos.x, next_pos.y)
-                d.path.pop(0)
-                d.current_zone = None
-
-                d.is_moving = True
-                self.animate_drone(d, center_pos.x, center_pos.y)
-
-                continue
+                d.wait_turns = 0
 
             cap = next(
                 (c for z, c in conns[d.current_zone] if z == next_zone), 1
@@ -138,8 +86,7 @@ class Simulation:
                 new_path = self.path_finder.find_best_path(
                     p_zones=[next_zone],
                     start_zone=d.current_zone,
-                    zone_counts=zone_counts,
-                    link_usage=self.link_usage
+                    zone_counts=zone_counts
                 )
 
                 if new_path and new_path[0] == d.current_zone:

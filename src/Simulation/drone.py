@@ -8,11 +8,5 @@ class Drone:
         self.delivered = False
         self.is_moving = False
         self.blocked = False
-        self.blocked_next: str = ""
-        self.in_transit: bool = False
-        self.transit_target: str = ""
-        self.transit_remaining: int = 0
-        self.transit_link: str = ""
-        self.transit_target_coords: tuple[float, float] = (0, 0)
-        self.transit_center_coords: tuple[float, float] = (0, 0)
-        self.transit_origin_coords: tuple[float, float] = (0, 0)
+        self.wait_turns = 0
+        self.prev_zone: str = ""

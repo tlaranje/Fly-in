@@ -24,7 +24,7 @@ class PathFinder:
         return path1
 
     def find_best_path(
-        self, start_zone=None, p_zones=None, zone_counts=None, link_usage=None
+        self, start_zone=None, p_zones=None, zone_counts=None
     ) -> list[str]:
         dist: dict[str, float] = {}
         prev: dict[str, str] = {}
