@@ -1,6 +1,7 @@
 from src.Simulation.visualizer import Visualizer
 from src.Simulation.drone import Drone
 from src.Graph import Graph, PathFinder
+from rich import print
 
 
 class Simulation:
@@ -19,8 +20,12 @@ class Simulation:
         self.paths: list[list[str]] = [[]]
 
     def set_drones_paths(self) -> None:
+        start_name = self.graph.map_data.start_hub.name
         for i, d in enumerate(self.drones):
-            d.path = list(self.paths[i % len(self.paths)])
+            path = list(self.paths[i % len(self.paths)])
+            if path and path[0] == start_name:
+                path = path[1:]
+            d.path = path
 
     def animate_drone(
             self, drone: Drone, x: float, y: float, on_complete=None
@@ -51,32 +56,35 @@ class Simulation:
             16, lambda: self.animate_drone(drone, x, y, on_complete)
         )
 
-    def move_drones(self, drones: list[Drone]) -> None:
+    def move_drones(self, drones: list[Drone]) -> list[str]:
         zone = self.graph.zones
         conns = self.graph.all_connections
         v = self.visualizer
+        turn_moves: list[str] = []
 
         for d in drones[:]:
             if getattr(d, 'is_moving', False) or len(d.path) == 0:
                 continue
 
             assert d.current_zone is not None
-
             next_zone = d.path[0]
 
-            if zone[next_zone].zone_type != "restricted":
-                d.wait_turns = 0
-                d.wait_target = None
-            else:
+            if zone[next_zone].zone_type == "restricted":
                 if d.wait_target != next_zone:
                     d.wait_target = next_zone
                     d.wait_turns = 0
-
                 d.wait_turns += 1
-
+                if d.wait_turns == 1:
+                    turn_moves.append(
+                        f"[bold blue]D{d.drone_id}-"
+                        f"{d.current_zone}->{next_zone}[/bold blue]"
+                    )
+                    continue
                 if d.wait_turns < 2:
                     continue
-
+                d.wait_turns = 0
+                d.wait_target = None
+            else:
                 d.wait_turns = 0
                 d.wait_target = None
 
@@ -87,29 +95,40 @@ class Simulation:
 
             if self.link_usage.get(link, 0) >= cap or \
                zone[next_zone].count_drones >= zone[next_zone].max_drones:
+                if zone[next_zone].zone_type == "restricted":
+                    d.wait_turns = 0
+                    d.wait_target = None
                 continue
 
-            if d.current_zone != self.graph.map_data.end_hub.name:
-                cx = (zone[next_zone].x - v.min_x) * v.scale + v.margin
-                cy = (zone[next_zone].y - v.min_y) * v.scale + v.margin
+            if d.current_zone == self.graph.map_data.end_hub.name:
+                continue
 
-                self.link_usage[link] = self.link_usage.get(link, 0) + 1
+            turn_moves.append(
+                f"[bold green]D{d.drone_id}-{next_zone}[/bold green]"
+            )
+
+            cx = (zone[next_zone].x - v.min_x) * v.scale + v.margin
+            cy = (zone[next_zone].y - v.min_y) * v.scale + v.margin
+
+            self.link_usage[link] = self.link_usage.get(link, 0) + 1
+            zone[d.current_zone].count_drones -= 1
+            zone[next_zone].count_drones += 1
+            d.current_zone = zone[next_zone].name
+            d.path.remove(next_zone)
+            d.is_moving = True
+
+            if d.current_zone == self.graph.map_data.end_hub.name:
                 zone[d.current_zone].count_drones -= 1
-                zone[next_zone].count_drones += 1
-                d.current_zone = zone[next_zone].name
-                d.path.remove(next_zone)
-                d.is_moving = True
 
-                if d.current_zone == self.graph.map_data.end_hub.name:
-                    zone[d.current_zone].count_drones -= 1
+                def on_arrive(drone=d):
+                    drone.is_moving = False
+                    if drone in self.drones:
+                        self.drones.remove(drone)
+                self.animate_drone(d, cx, cy, on_complete=on_arrive)
+            else:
+                self.animate_drone(d, cx, cy)
 
-                    def on_arrive(drone=d):
-                        drone.is_moving = False
-                        if drone in self.drones:
-                            self.drones.remove(drone)
-                    self.animate_drone(d, cx, cy, on_complete=on_arrive)
-                else:
-                    self.animate_drone(d, cx, cy)
+        return turn_moves
 
     def wait_for_animations(self) -> None:
         any_moving = any(getattr(d, 'is_moving', False) for d in self.drones)
@@ -138,7 +157,8 @@ class Simulation:
         vis.turn_count += 1
         vis.title_label.config(text=f"Turn {vis.turn_count}")
 
-        self.move_drones(self.drones)
+        print(f"\n[bold cyan]Turn [/bold cyan]{vis.turn_count}")
+        print("[bold red] | [/bold red]".join(self.move_drones(self.drones)))
         self.wait_for_animations()
 
     def toggle_mode(self, event):
