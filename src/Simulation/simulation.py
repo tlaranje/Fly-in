@@ -65,6 +65,7 @@ class Simulation:
             if getattr(d, 'is_moving', False) or not d.path:
                 continue
 
+            assert d.current_zone is not None
             next_zone = d.path[0]
             cap = next(
                 (c for z, c in conns[d.current_zone] if z == next_zone), 1
@@ -180,7 +181,7 @@ class Simulation:
         self.link_usage = {}
         self.wait_for_animations()
 
-    def reset(self, event=None):
+    def reset(self, event: object = None):
         v = self.visualizer
 
         v.canvas.delete("all")
@@ -201,7 +202,7 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.paths = self.path_finder.find_k_paths()
+        self.paths = self.path_finder.find_k_paths(k=5)
         self.set_drones_paths()
 
     def run(self) -> None:
@@ -217,6 +218,5 @@ class Simulation:
         self.drones += v.draw_drones()
         self.paths = self.path_finder.find_k_paths(k=3)
         self.set_drones_paths()
-
         v.root.after(500, self.step)
         v.root.mainloop()

@@ -77,7 +77,7 @@ class Visualizer:
             "white", "coral", "turquoise", "salmon"
         ]
         drones: list[Drone] = []
-        z = self.graph.zones["start"]
+        z = self.graph.zones[self.map_data.start_hub.name]
         i = 0
         cx = (z.x - self.min_x) * self.scale + self.margin
         cy = (z.y - self.min_y) * self.scale + self.margin
