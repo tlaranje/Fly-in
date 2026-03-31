@@ -1,10 +1,10 @@
 from src.Simulation import Simulation, Visualizer
 from src.Parsing import MapParser, DroneMap
+from src.Graph import Graph, Dijkstra
 from pydantic import ValidationError
-from src.Graph import Graph, PathFinder
 from rich import print
-import sys
 import traceback
+import sys
 
 
 def main() -> None:
@@ -14,7 +14,7 @@ def main() -> None:
         drone_map: DroneMap = map_parser.parse()
         graph = Graph(drone_map, main)
         v = Visualizer(graph)
-        p = PathFinder(graph, drone_map)
+        p = Dijkstra(graph, drone_map)
         s = Simulation(graph, v, p)
         s.run()
     except ValidationError as e:

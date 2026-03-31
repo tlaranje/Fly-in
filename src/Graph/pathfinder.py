@@ -3,99 +3,85 @@ from src.Graph import Graph
 import heapq
 
 
-class PathFinder:
+class Dijkstra:
     def __init__(self, graph: Graph, map_data: DroneMap) -> None:
         self.graph = graph
         self.start = map_data.start_hub.name
         self.end = map_data.end_hub.name
+        self.reservations: dict[tuple[str, int], int] = {}
+        self.reservations_links: dict[tuple[str, int], int] = {}
 
-    def find_k_paths(self, k=3) -> list[list[str]]:
+    def _apply_reservations(self, path: list[str]) -> None:
+        t = 0
+        self.reservations[(path[0], 0)] = self.reservations.get((path[0], 0), 0) + 1
+
+        for i in range(1, len(path)):
+            prev_node = path[i - 1]
+            curr_node = path[i]
+            zone = self.graph.zones[curr_node]
+            travel_time = 2 if zone.zone_type == "restricted" else 1
+            t += travel_time
+
+            self.reservations[(curr_node, t)] = self.reservations.get((curr_node, t), 0) + 1
+
+            link = tuple(sorted((prev_node, curr_node)))
+            key = (str(link), t)
+            self.reservations_links[key] = self.reservations_links.get(key, 0) + 1
+
+        for future in range(t + 1, t + 5):
+            self.reservations[(path[-1], future)] = self.reservations.get((path[-1], future), 0) + 1
+
+    def find_k_paths(self, k: int) -> list[list[str]]:
+        self.reservations = {}
+        self.reservations_links = {}
         paths = []
 
-        zone_usage: dict[str, int] = {}
-        zone_penalty: dict[str, int] = {}
-
         for _ in range(k):
-            path = self.find_best_path(
-                zone_usage=zone_usage,
-                zone_penalty=zone_penalty
-            )
-
-            if not path or path in paths:
-                break
-
+            path = self.find_best_path()
+            if not path:
+                paths.append([self.start])
+                continue
             paths.append(path)
-
-            for z in path[1:-1]:
-                zone_usage[z] = zone_usage.get(z, 0) + 1
-                zone_penalty[z] = zone_penalty.get(z, 0) + 2
+            self._apply_reservations(path)
 
         return paths
 
-    def find_best_path(
-        self,
-        start_zone=None,
-        p_zones=None,
-        zone_usage=None,
-        zone_penalty=None
-    ) -> list[str]:
-
-        dist: dict[str, float] = {}
-        prev: dict[str, str | None] = {}
-        pq: list[tuple[float, str]] = []
-        path: list[str] = []
-
-        penalty = 2
-
-        start = start_zone if start_zone else self.start
-
-        prev = {zone: None for zone in self.graph.zones}
-        dist = {zone: float("inf") for zone in self.graph.zones}
-        dist[start] = 0
-
-        heapq.heappush(pq, (0, start))
+    def find_best_path(self) -> list[str]:
+        pq = [(0, 0, self.start, [self.start])]
+        visited = set()
 
         while pq:
-            cost, curr_zone = heapq.heappop(pq)
+            cost, t, curr, path = heapq.heappop(pq)
 
-            if cost > dist[curr_zone]:
+            if curr == self.end:
+                return path
+
+            if (curr, t) in visited:
                 continue
+            visited.add((curr, t))
 
-            for z, _ in self.graph.all_connections[curr_zone]:
-                zone = self.graph.zones[z]
+            for neighbor, link_cap in self.graph.all_connections[curr]:
+                zone = self.graph.zones[neighbor]
 
                 if zone.zone_type == "blocked":
                     continue
 
-                move_cost = 2 if zone.zone_type == "restricted" else 1
+                travel_time = 2 if zone.zone_type == "restricted" else 1
+                arrival = t + travel_time
 
-                if zone_usage and zone_usage.get(z, 0) >= zone.max_drones:
-                    move_cost += penalty
+                occupied = self.reservations.get((neighbor, arrival), 0)
+                if occupied >= zone.max_drones:
+                    continue
 
-                if zone_penalty and z in zone_penalty:
-                    move_cost += zone_penalty[z]
+                link = tuple(sorted((curr, neighbor)))
+                link_key = (str(link), arrival)
+                if self.reservations_links.get(link_key, 0) >= link_cap:
+                    continue
 
-                if p_zones and z in p_zones:
-                    move_cost += penalty
+                move_cost = 0.5 if zone.zone_type == "priority" else travel_time
+                heapq.heappush(pq, (cost + move_cost, arrival, neighbor, path + [neighbor]))
 
-                new_cost = cost + move_cost
+            if self.reservations.get((curr, t + 1), 0) < self.graph.zones[curr].max_drones:
+                heapq.heappush(pq, (cost + 1, t + 1, curr, path + [curr]))
 
-                if new_cost < dist[z]:
-                    dist[z] = new_cost
-                    prev[z] = curr_zone
-                    heapq.heappush(pq, (new_cost, z))
-
-        nz: str | None = self.end
-
-        if nz is None:
-            return []
-
-        if prev[nz] is None and nz != start:
-            return []
-
-        while nz is not None:
-            path.append(nz)
-            nz = prev[nz]
-
-        path.reverse()
-        return path
+        return []

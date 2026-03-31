@@ -1,31 +1,30 @@
 from src.Simulation.visualizer import Visualizer
 from src.Simulation.drone import Drone
-from src.Graph import Graph, PathFinder
+from src.Graph import Graph, Dijkstra
 from rich import print
 import os
 
 
 class Simulation:
     def __init__(
-            self, graph: Graph, visualizer: Visualizer, path_finder: PathFinder
+            self, graph: Graph, visualizer: Visualizer, dijkstra: Dijkstra
     ) -> None:
         self.map_data = graph.map_data
         self.graph = graph
         self.visualizer = visualizer
         self.drones: list[Drone] = []
         self.link_usage: dict = {}
-        self.path_finder = path_finder
+        self.dijkstra = dijkstra
         self.turn_in_progress = False
         self.manual_mode = True
         self.paths: list[list[str]] = [[]]
 
     def set_drones_paths(self) -> None:
-        path_load = [0] * len(self.paths)
-
-        for d in self.drones:
-            i = path_load.index(min(path_load))
-            d.path = self.paths[i][:]
-            path_load[i] += 1
+        for i, drone in enumerate(self.drones):
+            if i < len(self.paths):
+                drone.path = self.paths[i][:]
+            else:
+                drone.path = []
 
     def animate_drone(
             self, drone: Drone, x: float, y: float, on_complete=None
@@ -221,7 +220,7 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.paths = self.path_finder.find_k_paths(k=10)
+        self.paths = self.dijkstra.find_k_paths(k=self.map_data.nb_drones)
         self.set_drones_paths()
 
     def run(self) -> None:
@@ -235,7 +234,7 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.paths = self.path_finder.find_k_paths(k=10)
+        self.paths = self.dijkstra.find_k_paths(k=self.map_data.nb_drones)
         self.set_drones_paths()
         v.root.after(500, self.step)
         v.root.mainloop()
