@@ -33,6 +33,7 @@ class Visualizer:
             self.root,
             text="Turn 0",
             font=("TkHeadingFont", 23, "bold"),
+            fg="white",
             bg=self.background_color
         )
         self.title_label.pack(before=self.canvas)

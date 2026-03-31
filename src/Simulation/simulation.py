@@ -12,7 +12,6 @@ class Simulation:
         self.graph = graph
         self.visualizer = visualizer
         self.drones: list[Drone] = []
-        self.turns: list[str] = []
         self.link_usage: dict = {}
         self.path_finder = path_finder
         self.turn_in_progress = False
@@ -63,62 +62,67 @@ class Simulation:
         turn_moves: list[str] = []
 
         for d in drones[:]:
-            if getattr(d, 'is_moving', False) or len(d.path) == 0:
+            if getattr(d, 'is_moving', False) or not d.path:
                 continue
 
-            assert d.current_zone is not None
             next_zone = d.path[0]
+            cap = next(
+                (c for z, c in conns[d.current_zone] if z == next_zone), 1
+            )
+            link = tuple(sorted((d.current_zone, next_zone)))
+            nz = zone[next_zone]
+            is_restricted = nz.zone_type == "restricted"
+            link_full = self.link_usage.get(link, 0) >= cap
+            zone_full = nz.count_drones >= nz.max_drones
+            is_full = link_full or zone_full
 
-            if zone[next_zone].zone_type == "restricted":
+            if is_restricted:
                 if d.wait_target != next_zone:
                     d.wait_target = next_zone
                     d.wait_turns = 0
-                d.wait_turns += 1
-                if d.wait_turns == 1:
+
+                if d.wait_turns == 0:
+                    if is_full:
+                        continue
+                    self.link_usage[link] = (
+                        self.link_usage.get(link, 0) + 1
+                    )
+                    d.wait_turns = 1
                     turn_moves.append(
                         f"[bold blue]D{d.drone_id}-"
                         f"{d.current_zone}->{next_zone}[/bold blue]"
                     )
-                    continue
-                if d.wait_turns < 2:
                     continue
                 d.wait_turns = 0
                 d.wait_target = None
             else:
                 d.wait_turns = 0
                 d.wait_target = None
+                if is_full:
+                    continue
 
-            cap = next(
-                (c for z, c in conns[d.current_zone] if z == next_zone), 1
-            )
-            link = tuple(sorted((d.current_zone, next_zone)))
-
-            if self.link_usage.get(link, 0) >= cap or \
-               zone[next_zone].count_drones >= zone[next_zone].max_drones:
-                if zone[next_zone].zone_type == "restricted":
-                    d.wait_turns = 0
-                    d.wait_target = None
-                continue
-
-            if d.current_zone == self.graph.map_data.end_hub.name:
+            end = self.graph.map_data.end_hub.name
+            if d.current_zone == end:
                 continue
 
             turn_moves.append(
                 f"[bold green]D{d.drone_id}-{next_zone}[/bold green]"
             )
 
-            cx = (zone[next_zone].x - v.min_x) * v.scale + v.margin
-            cy = (zone[next_zone].y - v.min_y) * v.scale + v.margin
+            cx = (nz.x - v.min_x) * v.scale + v.margin
+            cy = (nz.y - v.min_y) * v.scale + v.margin
 
-            self.link_usage[link] = self.link_usage.get(link, 0) + 1
+            if not is_restricted:
+                self.link_usage[link] = self.link_usage.get(link, 0) + 1
+
             zone[d.current_zone].count_drones -= 1
-            zone[next_zone].count_drones += 1
-            d.current_zone = zone[next_zone].name
+            nz.count_drones += 1
+            d.current_zone = nz.name
             d.path.remove(next_zone)
             d.is_moving = True
 
-            if d.current_zone == self.graph.map_data.end_hub.name:
-                zone[d.current_zone].count_drones -= 1
+            if d.current_zone == end:
+                zone[end].count_drones -= 1
 
                 def on_arrive(drone=d):
                     drone.is_moving = False
@@ -137,7 +141,7 @@ class Simulation:
             self.visualizer.root.after(16, self.wait_for_animations)
         else:
             self.turn_in_progress = False
-            if not len(self.drones) == 0:
+            if self.drones:
                 if not self.manual_mode:
                     self.visualizer.root.after(
                         250, lambda: self.on_key_n(None)
@@ -145,7 +149,7 @@ class Simulation:
             else:
                 return
 
-    def on_key_n(self, event):
+    def on_key_n(self, event: object):
         if self.turn_in_progress or len(self.drones) == 0:
             return
 
@@ -158,10 +162,12 @@ class Simulation:
         vis.title_label.config(text=f"Turn {vis.turn_count}")
 
         print(f"\n[bold cyan]Turn [/bold cyan]{vis.turn_count}")
-        print("[bold red] | [/bold red]".join(self.move_drones(self.drones)))
+        moves = self.move_drones(self.drones)
+        if moves:
+            print("[bold red] | [/bold red]".join(moves))
         self.wait_for_animations()
 
-    def toggle_mode(self, event):
+    def toggle_mode(self, event: object):
         self.manual_mode = not self.manual_mode
 
         if not self.manual_mode and not self.turn_in_progress:
