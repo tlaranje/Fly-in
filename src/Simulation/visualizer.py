@@ -73,8 +73,8 @@ class Visualizer:
 
     def draw_drones(self) -> list[Drone]:
         colors = [
-            "cyan", "lime", "magenta", "blue", "pink",
-            "white", "coral", "turquoise", "salmon"
+            "lime", "magenta", "pink", "white",
+            "coral", "turquoise", "salmon"
         ]
         drones: list[Drone] = []
         z = self.graph.zones[self.map_data.start_hub.name]
