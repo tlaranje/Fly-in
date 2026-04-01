@@ -24,7 +24,7 @@ class Simulation:
 
         for d in self.drones:
             i = path_load.index(min(path_load))
-            d.path = self.paths[i][:]
+            d.path = self.paths[i][1:]
             path_load[i] += 1
 
     def animate_drone(
