@@ -14,3 +14,5 @@ class Drone:
         self.blocked_turns: int = 0
         self.wait_target: str | None = None
         self.in_transit_to: str | None = None
+        self.schedule: list[tuple[str, int]] = []
+        self.schedule_index: int = 0

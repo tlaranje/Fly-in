@@ -117,7 +117,7 @@ class Visualizer:
             d = Drone(i, z.name)
             d.drone_tag = tag
             d.canva_id = circle_id
-            d.current_zone = z.name
+            d.curr_zone = z.name
             drones.append(d)
             i += 1
 

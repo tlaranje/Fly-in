@@ -20,12 +20,23 @@ class Simulation:
         self.paths: list[list[str]] = [[]]
 
     def set_drones_paths(self) -> None:
-        path_load = [0] * len(self.paths)
+        if not self.paths or not self.paths[0]:
+            return
 
-        for d in self.drones:
-            i = path_load.index(min(path_load))
-            d.path = self.paths[i][1:]
-            path_load[i] += 1
+        nb = len(self.drones)
+        paths = self.paths
+
+        # drone_id -> índice do path (round-robin)
+        assignments = [drone_id % len(paths) for drone_id in range(nb)]
+
+        # schedule global único — todos os drones partilham a mesma tabela
+        schedules = self.path_finder.schedule_all_drones_multi(paths, assignments)
+
+        for drone in self.drones:
+            drone.schedule = schedules[drone.drone_id]
+            drone.schedule_index = 0
+            path_idx = assignments[drone.drone_id]
+            drone.path = paths[path_idx][1:]
 
     def animate_drone(
             self, drone: Drone, x: float, y: float, on_complete=None
@@ -57,67 +68,56 @@ class Simulation:
         )
 
     def move_drones(self, drones: list[Drone]) -> list[str]:
+        current_turn = self.visualizer.turn_count
+
+        # Filtra só os drones cujo próximo passo está agendado para este turno
+        active = []
+        for d in drones:
+            if not d.schedule:
+                active.append(d)
+                continue
+            idx = d.schedule_index
+            if idx < len(d.schedule):
+                _zone, scheduled_turn = d.schedule[idx]
+                if current_turn >= scheduled_turn:
+                    active.append(d)
+
         zone = self.graph.zones
-        conns = self.graph.all_connections
         v = self.visualizer
 
         turn_moves: list[str] = []
         planned: list[tuple[Drone, str, bool]] = []
-        zone_to: dict[str, int] = {}
-        link_to: dict[tuple, int] = {}
-        zone_from: dict[str, int] = {}
 
-        # — FASE 1: decidir movimentos —
-
-        for d in drones:
+        # — FASE 1: decidir movimentos (usa `active`, não `drones`) —
+        for d in active:
             if not d.curr_zone or (not d.path and not d.in_transit_to):
                 continue
 
-            # Caso esteja no 2º turno de restricted
+            # 2º turno de zona restricted
             if d.in_transit_to:
                 planned.append((d, d.in_transit_to, True))
+                continue
 
-                zone_to[d.in_transit_to] = zone_to.get(d.in_transit_to, 0) + 1
-                zone_from[d.curr_zone] = zone_from.get(d.curr_zone, 0) + 1
-
+            if not d.path:
                 continue
 
             next_zone = d.path[0]
             nz = zone[next_zone]
-            link = tuple(sorted((d.curr_zone, next_zone)))
 
             if nz.zone_type == "blocked":
                 continue
 
-            # Verificar capacidades
-            zone_ok = (
-                nz.count_drones - zone_from.get(next_zone, 0)
-                + zone_to.get(next_zone, 0)
-            ) < nz.max_drones
-            cap = next(
-                (c for z, c in conns[d.curr_zone] if z == next_zone), 1
-            )
-            link_ok = link_to.get(link, 0) < cap
-
-            if not zone_ok or not link_ok:
-                continue
-
-            # Restricted → movimento em 2 turnos
-            link_to[link] = link_to.get(link, 0) + 1
-            zone_from[d.curr_zone] = zone_from.get(d.curr_zone, 0) + 1
             if nz.zone_type == "restricted":
                 turn_moves.append(
                     f"[bold yellow]D{d.drone_id}-"
-                    f"{d.curr_zone}->{next_zone}[bold yellow]"
+                    f"{d.curr_zone}->{next_zone}[/bold yellow]"
                 )
                 d.in_transit_to = next_zone
-                zone_to[next_zone] = zone_to.get(next_zone, 0) + 1
             else:
                 turn_moves.append(
-                    f"[bold green]D{d.drone_id}-{next_zone}[bold green]"
+                    f"[bold green]D{d.drone_id}-{next_zone}[/bold green]"
                 )
                 planned.append((d, next_zone, False))
-                zone_to[next_zone] = zone_to.get(next_zone, 0) + 1
 
         # — FASE 2: executar movimentos —
         end = self.graph.map_data.end_hub.name
@@ -129,11 +129,12 @@ class Simulation:
             zone[d.curr_zone].count_drones -= 1
             nz.count_drones += 1
             d.curr_zone = next_zone
-
+            d.schedule_index += 1
             d.path.pop(0)
+
             if arriving_restricted:
                 turn_moves.append(
-                    f"[green3]D{d.drone_id}-{next_zone}[green3]"
+                    f"[green3]D{d.drone_id}-{next_zone}[/green3]"
                 )
                 d.in_transit_to = None
 
@@ -147,6 +148,7 @@ class Simulation:
                     drone.is_moving = False
                     if drone in self.drones:
                         self.drones.remove(drone)
+
                 self.animate_drone(d, cx, cy, on_complete=on_arrive)
             else:
                 d.is_moving = True

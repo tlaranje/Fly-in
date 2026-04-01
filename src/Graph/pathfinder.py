@@ -99,3 +99,48 @@ class PathFinder:
 
         path.reverse()
         return path
+
+    def schedule_all_drones_multi(
+        self,
+        paths: list[list[str]],
+        drone_path_assignments: list[int],  # drone_id -> índice do path
+    ) -> list[list[tuple[str, int]]]:
+        """
+        Schedule global: todos os drones partilham a mesma tabela de reservas.
+        drone_path_assignments[i] = índice do path para o drone i
+        """
+        zone_turns: dict[str, dict[int, int]] = {
+            z: {} for z in self.graph.zones
+        }
+        nb_drones = len(drone_path_assignments)
+        schedules: list[list[tuple[str, int]]] = []
+
+        for drone_id in range(nb_drones):
+            path_idx = drone_path_assignments[drone_id]
+            path = paths[path_idx]
+            schedule: list[tuple[str, int]] = []
+            current_turn = 0
+
+            for zone_name in path[1:]:
+                zone = self.graph.zones[zone_name]
+                move_cost = 2 if zone.zone_type == "restricted" else 1
+
+                while True:
+                    slots = range(current_turn, current_turn + move_cost)
+                    full = any(
+                        zone_turns[zone_name].get(t, 0) >= zone.max_drones
+                        for t in slots
+                    )
+                    if not full:
+                        break
+                    current_turn += 1
+
+                for t in range(current_turn, current_turn + move_cost):
+                    zone_turns[zone_name][t] = zone_turns[zone_name].get(t, 0) + 1
+
+                schedule.append((zone_name, current_turn))
+                current_turn += move_cost
+
+            schedules.append(schedule)
+
+        return schedules
