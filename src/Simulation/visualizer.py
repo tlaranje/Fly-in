@@ -1,20 +1,22 @@
 from src.Simulation.drone import Drone
-from src.Graph import Graph
+from typing import TYPE_CHECKING
 import tkinter as tk
+
+if TYPE_CHECKING:
+    from src.Parsing import DroneMap
 
 
 class Visualizer:
-    def __init__(self, graph: Graph) -> None:
-        self.map_data = graph.map_data
+    def __init__(self, d_map: "DroneMap") -> None:
+        self.d_map = d_map
         self.root = tk.Tk()
         self.root.title("Fly-in")
-        self.graph = graph
         self.scale = 64
         self.margin = 32
-        self.min_x = min(zone.x for zone in graph.zones.values())
-        self.min_y = min(zone.y for zone in graph.zones.values())
-        self.max_x = max(zone.x for zone in graph.zones.values())
-        self.max_y = max(zone.y for zone in graph.zones.values())
+        self.min_x = min(zone.x for zone in d_map.zones.values())
+        self.min_y = min(zone.y for zone in d_map.zones.values())
+        self.max_x = max(zone.x for zone in d_map.zones.values())
+        self.max_y = max(zone.y for zone in d_map.zones.values())
         self.width = (self.max_x - self.min_x) * self.scale + self.margin * 2
         self.height = (self.max_y - self.min_y) * self.scale + self.margin * 2
         self.background_color = "#2b2b2b"
@@ -40,7 +42,7 @@ class Visualizer:
         self.turn_count = 0
 
     def draw_zones(self) -> None:
-        for zone in self.graph.zones.values():
+        for zone in self.d_map.zones.values():
             cx = (zone.x - self.min_x) * self.scale + self.margin
             cy = (zone.y - self.min_y) * self.scale + self.margin
 
@@ -58,10 +60,10 @@ class Visualizer:
             zone.canva_id = rec_id
 
     def draw_connections(self) -> None:
-        for zone1, n in self.graph.all_connections.items():
-            z1 = self.graph.zones[zone1]
+        for zone1, n in self.d_map.connections.items():
+            z1 = self.d_map.zones[zone1]
             for zone2, _ in n:
-                z2 = self.graph.zones[zone2]
+                z2 = self.d_map.zones[zone2]
                 x1 = (z1.x - self.min_x) * self.scale + self.margin
                 y1 = (z1.y - self.min_y) * self.scale + self.margin
                 x2 = (z2.x - self.min_x) * self.scale + self.margin
@@ -76,15 +78,22 @@ class Visualizer:
             "lime", "magenta", "pink", "white",
             "coral", "turquoise", "salmon"
         ]
-        drones: list[Drone] = []
-        z = self.graph.zones[self.map_data.start_hub.name]
-        i = 0
-        cx = (z.x - self.min_x) * self.scale + self.margin
-        cy = (z.y - self.min_y) * self.scale + self.margin
 
-        while i < self.map_data.nb_drones:
+        drones: list[Drone] = []
+        z = self.d_map.zones[self.d_map.start_zone.name]
+
+        i = 0
+
+        while i < self.d_map.nb_drones:
+            d = self.d_map.drones[i]
             tag = f"drone_{i}"
             color = colors[i % len(colors)]
+
+            d.drone_tag = tag
+            d.curr_zone = z.name
+
+            cx = (z.x - self.min_x) * self.scale + self.margin
+            cy = (z.y - self.min_y) * self.scale + self.margin
 
             radius_big = 10
             circle_id = self.canvas.create_oval(
@@ -93,31 +102,28 @@ class Visualizer:
                 fill=color,
                 tags=tag
             )
+
             offset = 2
             x1, y1, x2, y2 = self.canvas.coords(circle_id)
-            x1 += offset
-            x2 -= offset
-            y1 += offset
-            y2 -= offset
+
             corners = [
-                (x1, y1),
-                (x2, y1),
-                (x1, y2),
-                (x2, y2)
+                (x1 + offset, y1 + offset),
+                (x2 - offset, y1 + offset),
+                (x1 + offset, y2 - offset),
+                (x2 - offset, y2 - offset)
             ]
 
             radius_small = 5
-            for j, (ccx, ccy) in enumerate(corners):
+            for ccx, ccy in corners:
                 self.canvas.create_oval(
                     ccx - radius_small, ccy - radius_small,
                     ccx + radius_small, ccy + radius_small,
                     fill=color,
                     tags=tag
                 )
-            d = Drone(i, z.name)
-            d.drone_tag = tag
+
             d.canva_id = circle_id
-            d.curr_zone = z.name
+
             drones.append(d)
             i += 1
 

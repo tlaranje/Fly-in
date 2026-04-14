@@ -1,12 +1,10 @@
 from src.Parsing.validators import DroneMap, Zone, Connection
+from src.Simulation import Drone
 from typing import Any
 import re
 
 
 class MapParser:
-    def __init__(self, filepath: str):
-        self.filepath = filepath
-
     def parse_metadata(self, data: str) -> dict[str, Any]:
         if data is None:
             return {}
@@ -20,25 +18,30 @@ class MapParser:
 
         return metadata
 
-    def parse(self) -> DroneMap:
+    def parse(self, filepath: str) -> DroneMap:
         map_data: dict[str, Any] = {
-            "nb_drones": "",
-            "start_hub": Zone,
-            "end_hub": Zone,
-            "hubs": [],
-            "connections": [],
+            "nb_drones": 0,
+            "drones": {},
+            "start_zone": None,
+            "end_zone": None,
+            "zones": {},
+            "connections": {},
         }
 
-        with open(self.filepath, "r") as fd:
+        with open(filepath, "r") as fd:
             for line in fd:
                 line = line.rstrip()
 
                 if line.startswith('#'):
                     continue
+
                 if line.startswith("nb_drones"):
                     map_data["nb_drones"] = int(line.split(':')[1].strip())
-                if "hub" in line:
-                    pattern = re.compile(r"""
+                    for i in range(map_data["nb_drones"]):
+                        map_data["drones"][i + 1] = Drone(drone_id=i + 1)
+
+                if ":" in line and not line.startswith("connection"):
+                    ZONE_PATTERN = re.compile(r"""
                         ^\w+:             # line starts with zone type prefix
                         \s+(\S+)\s+       # whitespace + zone name + whitespace
                         (-?\d+)\s+(-?\d+) # x + whitespace + y
@@ -48,7 +51,7 @@ class MapParser:
                         )?
                     """, re.VERBOSE)
 
-                    match = re.match(pattern, line)
+                    match = re.match(ZONE_PATTERN, line)
 
                     if match:
                         name = match.group(1)
@@ -67,13 +70,15 @@ class MapParser:
 
                         prefix = line.split(':')[0]
                         if prefix == "start_hub":
-                            map_data["start_hub"] = zone
+                            map_data["zones"][zone.name] = zone
+                            map_data["start_zone"] = zone
                         elif prefix == "end_hub":
-                            map_data["end_hub"] = zone
+                            map_data["zones"][zone.name] = zone
+                            map_data["end_zone"] = zone
                         elif prefix == "hub":
-                            map_data["hubs"].append(zone)
-                if line.startswith("connection"):
-                    pattern = re.compile(r"""
+                            map_data["zones"][zone.name] = zone
+                if ":" in line and line.startswith("connection"):
+                    CONN_PATTERN = re.compile(r"""
                         ^connection:    # line starts with connection:
                         \s+([^-\s]+)-   # whitespace + zone1 name + separator
                         ([^-\s]+)       # zone2 name
@@ -82,26 +87,34 @@ class MapParser:
                             ([^\]]*)\]  # metadata content + closing bracket
                         )?
                     """, re.VERBOSE)
-                    match = re.match(pattern, line)
+                    match = re.match(CONN_PATTERN, line)
 
                     if match:
                         zone1 = match.group(1)
                         zone2 = match.group(2)
+                        name = "-".join(sorted([zone1, zone2]))
                         meta = self.parse_metadata(match.group(3))
-                    c = Connection(
-                        zone1=zone1, zone2=zone2,
-                        **({} if not meta else {
-                                'max_link_capacity': int(meta.get(
-                                    'max_link_capacity', 1
-                                ))
-                        })
-                    )
-                    map_data["connections"].append(c)
+                        c = Connection(
+                            zone1=zone1, zone2=zone2, name=name,
+                            **({} if not meta else {
+                                    'max_link_capacity': int(meta.get(
+                                        'max_link_capacity', 1
+                                    ))
+                            })
+                        )
+                        map_data["connections"][c.name] = c
+
+        if map_data["start_zone"] is None:
+            raise ValueError("Missing start_zone")
+
+        if map_data["end_zone"] is None:
+            raise ValueError("Missing end_zone")
 
         return DroneMap(
             nb_drones=map_data["nb_drones"],
-            start_hub=map_data["start_hub"],
-            end_hub=map_data["end_hub"],
-            hubs=map_data["hubs"],
+            drones=map_data["drones"],
+            start_zone=map_data["start_zone"],
+            end_zone=map_data["end_zone"],
+            zones=map_data["zones"],
             connections=map_data["connections"]
         )

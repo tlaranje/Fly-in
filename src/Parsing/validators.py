@@ -1,12 +1,34 @@
 from pydantic import BaseModel, model_validator
 from typing import Optional, Any, Self
+from src.Simulation import Drone
+from enum import Enum
+
+
+class Zone_Types(Enum):
+    # (Name, Cost, priotity)
+    NORMAL = ("normal", 1, 0)
+    BLOCKED = ("blocked", float("inf"), 0)
+    RESTRICTED = ("restricted", 2, 0)
+    PRIORITY = ("priority", 1, 1)
+
+    @property
+    def name_str(self):
+        return self.value[0]
+
+    @property
+    def cost(self):
+        return self.value[1]
+
+    @property
+    def priority(self):
+        return self.value[2]
 
 
 class Zone(BaseModel):
     name: str
     x: int
     y: int
-    zone_type: str = "normal"
+    zone_type: Zone_Types = Zone_Types.NORMAL
     color: Optional[str] = None
     max_drones: int = 1
     count_drones: int = 0
@@ -16,6 +38,9 @@ class Zone(BaseModel):
     @classmethod
     def check_fields(cls, values: dict[str, Any]) -> Any:
         errors = ["Zone errors:"]
+
+        # if values is None:
+        #     return {}
 
         name = values.get('name')
         if name is None:
@@ -36,11 +61,18 @@ class Zone(BaseModel):
             errors.append("'y' must be a integer")
 
         VALID_ZONE_TYPES = ["normal", "blocked", "restricted", "priority"]
-        zt = values.get('zone_type', 'normal')
-        if zt not in VALID_ZONE_TYPES:
-            errors.append(
-                f"'zone_type' must be one of {VALID_ZONE_TYPES}, got '{zt}'"
-            )
+        zt = values.get('zone_type', Zone_Types.NORMAL)
+        if isinstance(zt, str):
+            if zt not in VALID_ZONE_TYPES:
+                errors.append(
+                    f"'zone_type' must be one of {VALID_ZONE_TYPES}, "
+                    f"got '{zt}'"
+                )
+            else:
+                values['zone_type'] = Zone_Types[zt.upper()]
+
+        elif not isinstance(zt, Zone_Types):
+            errors.append("'zone_type' must be a string or Zone_Types enum")
 
         color = values.get('color')
         if color is not None and not isinstance(color, str):
@@ -60,13 +92,14 @@ class Connection(BaseModel):
     zone1: str
     zone2: str
     max_link_capacity: int = 1
+    name: str
 
     @model_validator(mode="before")
     @classmethod
     def check_fields(cls, values: dict[str, Any]) -> Any:
         errors = ["Connection errors:"]
 
-        for field in ('zone1', 'zone2'):
+        for field in ('zone1', 'zone2', 'name'):
             v = values.get(field)
             if v is None:
                 errors.append(f"'{field}' field is missing.")
@@ -85,10 +118,11 @@ class Connection(BaseModel):
 
 class DroneMap(BaseModel):
     nb_drones: int
-    start_hub: Zone
-    end_hub: Zone
-    hubs: list[Zone] = []
-    connections: list[Connection] = []
+    drones: dict[int, Drone]
+    start_zone: Zone
+    end_zone: Zone
+    zones: dict[str, Zone]
+    connections: dict[str, Connection]
 
     @model_validator(mode="before")
     @classmethod
@@ -107,17 +141,25 @@ class DroneMap(BaseModel):
     @model_validator(mode="after")
     def check_unique_names(self) -> Self:
         errors = ["DroneMap errors:"]
-        all_zones = [self.start_hub, self.end_hub] + self.hubs
-        names = [z.name for z in all_zones]
+        # for z in [self.start_hub, self.end_hub] + self.zones:
+        # self.zones[z.name] = z
+        names = [z for z in self.zones]
+        # print([(z.name, _) for z in self.zones.items()])
+
         if len(names) != len(set(names)):
             errors.append("Zone names must be unique")
 
         seen = set()
-        for c in self.connections:
+
+        for c in self.connections.values():
             key = frozenset([c.zone1, c.zone2])
+
             if key in seen:
                 errors.append(f"Duplicate connection: {c.zone1}-{c.zone2}")
+
             seen.add(key)
+
         if len(errors) > 1:
             raise ValueError("\n    ".join(errors))
+
         return self

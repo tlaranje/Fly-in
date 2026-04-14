@@ -1,47 +1,31 @@
-from src.Simulation.visualizer import Visualizer
-from src.Simulation.drone import Drone
-from src.Graph import Graph, PathFinder
+from typing import TYPE_CHECKING
 from rich import print
 import os
+
+if TYPE_CHECKING:
+    from src.Simulation.visualizer import Visualizer
+    from src.Simulation.drone import Drone
+    from src.Parsing import DroneMap
+    from src.Graph import Dijkstra
 
 
 class Simulation:
     def __init__(
-            self, graph: Graph, visualizer: Visualizer, path_finder: PathFinder
+            self, d_map: "DroneMap", vis: "Visualizer", dijkstra: "Dijkstra"
     ) -> None:
-        self.map_data = graph.map_data
-        self.graph = graph
-        self.visualizer = visualizer
-        self.drones: list[Drone] = []
+        self.d_map = d_map
+        self.vis = vis
+        self.drones: list["Drone"] = []
         self.link_usage: dict = {}
-        self.path_finder = path_finder
+        self.dijkstra = dijkstra
         self.turn_in_progress = False
         self.manual_mode = True
         self.paths: list[list[str]] = [[]]
 
-    def set_drones_paths(self) -> None:
-        if not self.paths or not self.paths[0]:
-            return
-
-        nb = len(self.drones)
-        paths = self.paths
-
-        # drone_id -> índice do path (round-robin)
-        assignments = [drone_id % len(paths) for drone_id in range(nb)]
-
-        # schedule global único — todos os drones partilham a mesma tabela
-        schedules = self.path_finder.schedule_all_drones_multi(paths, assignments)
-
-        for drone in self.drones:
-            drone.schedule = schedules[drone.drone_id]
-            drone.schedule_index = 0
-            path_idx = assignments[drone.drone_id]
-            drone.path = paths[path_idx][1:]
-
     def animate_drone(
-            self, drone: Drone, x: float, y: float, on_complete=None
+            self, drone: "Drone", x: float, y: float, on_complete=None
     ) -> None:
-        coords = self.visualizer.canvas.coords(drone.canva_id)
+        coords = self.vis.canvas.coords(drone.canva_id)
 
         if not coords:
             return
@@ -56,22 +40,22 @@ class Simulation:
         if on_complete:
             on_complete()
         if distance <= step:
-            self.visualizer.canvas.move(drone.drone_tag, dx, dy)
+            self.vis.canvas.move(drone.drone_tag, dx, dy)
             drone.is_moving = False
             return
 
         move_x = dx / distance * step
         move_y = dy / distance * step
-        self.visualizer.canvas.move(drone.drone_tag, move_x, move_y)
-        self.visualizer.root.after(
+        self.vis.canvas.move(drone.drone_tag, move_x, move_y)
+        self.vis.root.after(
             16, lambda: self.animate_drone(drone, x, y, on_complete)
         )
 
     def move_drones(self, drones: list[Drone]) -> list[str]:
-        current_turn = self.visualizer.turn_count
-
-        # Filtra só os drones cujo próximo passo está agendado para este turno
+        current_turn = self.vis.turn_count
+        v = self.vis
         active = []
+
         for d in drones:
             if not d.schedule:
                 active.append(d)
@@ -82,18 +66,15 @@ class Simulation:
                 if current_turn >= scheduled_turn:
                     active.append(d)
 
-        zone = self.graph.zones
-        v = self.visualizer
+        zone = self.d_map.zones
 
         turn_moves: list[str] = []
         planned: list[tuple[Drone, str, bool]] = []
 
-        # — FASE 1: decidir movimentos (usa `active`, não `drones`) —
         for d in active:
             if not d.curr_zone or (not d.path and not d.in_transit_to):
                 continue
 
-            # 2º turno de zona restricted
             if d.in_transit_to:
                 planned.append((d, d.in_transit_to, True))
                 continue
@@ -119,8 +100,7 @@ class Simulation:
                 )
                 planned.append((d, next_zone, False))
 
-        # — FASE 2: executar movimentos —
-        end = self.graph.map_data.end_hub.name
+        end = self.d_map.end_zone.name
 
         for d, next_zone, arriving_restricted in planned:
             assert d.curr_zone is not None
@@ -160,12 +140,12 @@ class Simulation:
         any_moving = any(getattr(d, 'is_moving', False) for d in self.drones)
 
         if any_moving:
-            self.visualizer.root.after(16, self.wait_for_animations)
+            self.vis.root.after(16, self.wait_for_animations)
         else:
             self.turn_in_progress = False
             if self.drones:
                 if not self.manual_mode:
-                    self.visualizer.root.after(
+                    self.vis.root.after(
                         100, lambda: self.on_key_n(None)
                     )
             else:
@@ -176,7 +156,7 @@ class Simulation:
             return
 
         self.turn_in_progress = True
-        vis = self.visualizer
+        vis = self.vis
 
         self.link_usage = {}
 
@@ -203,14 +183,14 @@ class Simulation:
         self.wait_for_animations()
 
     def reset(self, event: object = None):
-        v = self.visualizer
+        v = self.vis
         os.system("clear")
         v.canvas.delete("all")
 
         v.turn_count = 0
         v.title_label.config(text="Turn 0")
 
-        for zone in self.graph.zones.values():
+        for zone in self.d_map.zones.values():
             zone.count_drones = 0
 
         self.drones.clear()
@@ -223,11 +203,9 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.paths = self.path_finder.find_k_paths(k=10)
-        self.set_drones_paths()
 
     def run(self) -> None:
-        v = self.visualizer
+        v = self.vis
 
         v.root.bind("m", self.toggle_mode)
         v.root.bind("n", self.on_key_n)
@@ -237,7 +215,6 @@ class Simulation:
         v.draw_zones()
 
         self.drones += v.draw_drones()
-        self.paths = self.path_finder.find_k_paths(k=10)
-        self.set_drones_paths()
+
         v.root.after(500, self.step)
         v.root.mainloop()
