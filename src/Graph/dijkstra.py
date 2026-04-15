@@ -1,6 +1,5 @@
 from typing import Any, TYPE_CHECKING
 from src.Parsing import Zone_Types as ZT
-from rich import print
 import heapq
 
 if TYPE_CHECKING:
@@ -14,41 +13,32 @@ class Dijkstra():
         self.reservations_links: dict[tuple[str, int], int] = {}
 
     def is_link_available(self, zone1: str, zone2: str, turn: int) -> bool:
-
         key = "-".join(sorted([zone1, zone2]))
         conn = self.d_map.connections.get(key)
 
         assert conn is not None
-
-        # self.reservations_links[(conn.name, turn)] = (
-        #     self.reservations_links.get((conn.name, turn), 0) + 1
-        # )
 
         link_usage = self.reservations_links.get((conn.name, turn), 0)
         return link_usage < conn.max_link_capacity
 
     def is_zone_available(self, zone: str, turn: int) -> bool:
         z = self.d_map.zones[zone]
-
-        # self.reservations[(z.name, turn)] = (
-        #     self.reservations.get((z.name, turn), 0) + 1
-        # )
-
         zone_usage = self.reservations.get((z.name, turn), 0)
         return zone_usage < z.max_drones
 
     def solve(self) -> tuple[dict[int, list[str]], int]:
+        turns_result: dict[int, list[str]] = {}
         start = self.d_map.start_zone.name
         end = self.d_map.end_zone.name
         path: list[str] = []
         total_turns: int = 0
-        turns_result: dict[int, list[str]] = {}
 
         for (d_id, d) in self.d_map.drones.items():
             path = self.find_path(start, end, d_id)
             if path:
                 d.path = path
                 self.apply_reservations(path)
+                turns_result[d_id] = path
             else:
                 turns_result[d_id] = [start]
                 d.path = [start]
@@ -67,7 +57,6 @@ class Dijkstra():
         visited = set()
 
         while pq:
-            print(pq)
             cost, turn, curr_zone, path = heapq.heappop(pq)
             if curr_zone == end:
                 return path
@@ -121,39 +110,43 @@ class Dijkstra():
                                     path + [curr_zone]))
         return None
 
-    def get_connection_obj(self, identifier: str | tuple[str, str]) -> Any:
-        """
-        Retrieve a connection object by identifier or node pair.
-
-        Args:
-            identifier: Connection name or tuple of connected node names.
-
-        Returns:
-            The matching connection object, or None if not found.
-        """
-
     def apply_reservations(self, path: list[str]) -> None:
-        """
-        Reserve nodes and links for a calculated path.
+        start_zone = self.d_map.zones["start"]
+        self.reservations[(start_zone.name, 0)] = (
+            self.reservations.get((start_zone.name, 0), 0) + 1
+        )
+        turn = 0
+        i = 1
+        while i < len(path):
+            prev_zone = path[i - 1]
+            if path[i] in self.d_map.zones:
+                next_name = path[i]
+            else:
+                if i + 1 >= len(path):
+                    break
+                next_name = path[i + 1]
+                if next_name not in self.d_map.zones:
+                    break
+            next_zone = self.d_map.zones[next_name]
+            move_cost = next_zone.zone_type.cost
+            conn = self.d_map.connections.get(
+                "-".join(sorted([prev_zone, next_name])), None
+            )
+            for s in range(move_cost):
+                t = turn + 1 + s
+                self.reservations[(next_name, t)] = (
+                    self.reservations.get((next_name, t), 0) + 1)
+                if conn:
+                    key = (conn.name, t)
+                    self.reservations_links[key] = (
+                        self.reservations_links.get(key, 0) + 1)
+            turn += move_cost
+            if path[i] not in self.d_map.zones:
+                i += 2
+            else:
+                i += 1
 
-        Respects zone movement: normal/priority = 1 turn, restricted = 2 turns.
-
-        Args:
-            path: Path to reserve, as a list of node/connection names.
-
-        Returns:
-            None.
-        """
-
-    def output(self, all_results: dict[int, list[str]],
-               path_file: str) -> None:
-        """
-        Write the simulation results to an output file.
-
-        Args:
-            all_results: Mapping of drone ids to their computed paths.
-            path_file: Destination file path for the output.
-
-        Returns:
-            None.
-        """
+        arrival_name = self.d_map.zones[path[-1]].name
+        for future_t in range(turn + 1, turn + 11):
+            self.reservations[(arrival_name, future_t)] = (
+                self.reservations.get((arrival_name, future_t), 0) + 1)

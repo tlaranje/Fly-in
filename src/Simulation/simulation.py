@@ -15,7 +15,6 @@ class Simulation:
     ) -> None:
         self.d_map = d_map
         self.vis = vis
-        self.drones: list["Drone"] = []
         self.link_usage: dict = {}
         self.dijkstra = dijkstra
         self.turn_in_progress = False
@@ -23,11 +22,11 @@ class Simulation:
         self.paths: list[list[str]] = [[]]
 
     def animate_drone(
-            self, drone: "Drone", x: float, y: float, on_complete=None
+        self, drone: "Drone", x: float, y: float, on_complete=None
     ) -> None:
         coords = self.vis.canvas.coords(drone.canva_id)
-
         if not coords:
+            drone.is_moving = False
             return
 
         cur_x = (coords[0] + coords[2]) / 2
@@ -37,11 +36,11 @@ class Simulation:
         distance = (dx**2 + dy**2) ** 0.5
         step = 5
 
-        if on_complete:
-            on_complete()
         if distance <= step:
             self.vis.canvas.move(drone.drone_tag, dx, dy)
             drone.is_moving = False
+            if on_complete:
+                on_complete()
             return
 
         move_x = dx / distance * step
@@ -51,84 +50,56 @@ class Simulation:
             16, lambda: self.animate_drone(drone, x, y, on_complete)
         )
 
-    def move_drones(self, drones: list[Drone]) -> list[str]:
-        current_turn = self.vis.turn_count
-        v = self.vis
-        active = []
-
-        for d in drones:
-            if not d.schedule:
-                active.append(d)
-                continue
-            idx = d.schedule_index
-            if idx < len(d.schedule):
-                _zone, scheduled_turn = d.schedule[idx]
-                if current_turn >= scheduled_turn:
-                    active.append(d)
-
-        zone = self.d_map.zones
-
+    def move_drones(self) -> list[str]:
+        end = self.d_map.end_zone.name
         turn_moves: list[str] = []
-        planned: list[tuple[Drone, str, bool]] = []
+        v = self.vis
 
-        for d in active:
-            if not d.curr_zone or (not d.path and not d.in_transit_to):
-                continue
-
-            if d.in_transit_to:
-                planned.append((d, d.in_transit_to, True))
-                continue
-
+        for (d_id, d) in list(self.d_map.drones.items()):
             if not d.path:
                 continue
 
-            next_zone = d.path[0]
-            nz = zone[next_zone]
+            next_step = d.path.pop(0)
+            dest_x, dest_y = 0.0, 0.0
 
-            if nz.zone_type == "blocked":
-                continue
+            if next_step in self.d_map.zones:
+                nz = self.d_map.zones[next_step]
+                dest_x = nz.x
+                dest_y = nz.y
 
-            if nz.zone_type == "restricted":
+                color = (
+                    "blue"
+                    if nz.zone_type.name.lower() == "restricted" else
+                    "green"
+                )
+                turn_moves.append(
+                    f"[bold {color}]D{d.drone_id}-{next_step}[/bold {color}]"
+                )
+                d.curr_zone = next_step
+
+            elif next_step in self.d_map.connections:
+                conn = self.d_map.connections[next_step]
+                z1 = self.d_map.zones[conn.zone1]
+                z2 = self.d_map.zones[conn.zone2]
+
+                dest_x = (z1.x + z2.x) / 2
+                dest_y = (z1.y + z2.y) / 2
                 turn_moves.append(
                     f"[bold yellow]D{d.drone_id}-"
-                    f"{d.curr_zone}->{next_zone}[/bold yellow]"
+                    f"{"->".join(sorted(next_step.split('-')))}[/bold yellow]"
                 )
-                d.in_transit_to = next_zone
-            else:
-                turn_moves.append(
-                    f"[bold green]D{d.drone_id}-{next_zone}[/bold green]"
-                )
-                planned.append((d, next_zone, False))
 
-        end = self.d_map.end_zone.name
+            cx = (dest_x - v.min_x) * v.scale + v.margin
+            cy = (dest_y - v.min_y) * v.scale + v.margin
 
-        for d, next_zone, arriving_restricted in planned:
-            assert d.curr_zone is not None
-            nz = zone[next_zone]
-
-            zone[d.curr_zone].count_drones -= 1
-            nz.count_drones += 1
-            d.curr_zone = next_zone
-            d.schedule_index += 1
-            d.path.pop(0)
-
-            if arriving_restricted:
-                turn_moves.append(
-                    f"[green3]D{d.drone_id}-{next_zone}[/green3]"
-                )
-                d.in_transit_to = None
-
-            cx = (nz.x - v.min_x) * v.scale + v.margin
-            cy = (nz.y - v.min_y) * v.scale + v.margin
-
-            if d.curr_zone == end:
-                nz.count_drones -= 1
-
+            if next_step == end:
                 def on_arrive(drone=d):
                     drone.is_moving = False
-                    if drone in self.drones:
-                        self.drones.remove(drone)
+                    if drone.drone_id in self.d_map.drones:
+                        del self.d_map.drones[drone.drone_id]
+                        self.vis.canvas.delete(drone.drone_tag)
 
+                d.is_moving = True
                 self.animate_drone(d, cx, cy, on_complete=on_arrive)
             else:
                 d.is_moving = True
@@ -137,37 +108,38 @@ class Simulation:
         return turn_moves
 
     def wait_for_animations(self) -> None:
-        any_moving = any(getattr(d, 'is_moving', False) for d in self.drones)
+        drones_list = list(self.d_map.drones.values())
+        any_moving = any(getattr(d, 'is_moving', False) for d in drones_list)
 
         if any_moving:
             self.vis.root.after(16, self.wait_for_animations)
         else:
             self.turn_in_progress = False
-            if self.drones:
+            if self.d_map.drones:
                 if not self.manual_mode:
-                    self.vis.root.after(
-                        100, lambda: self.on_key_n(None)
-                    )
-            else:
-                return
+                    self.vis.root.after(100, lambda: self.on_key_n(None))
 
     def on_key_n(self, event: object):
-        if self.turn_in_progress or len(self.drones) == 0:
+        if self.turn_in_progress:
+            return
+
+        if len(self.d_map.drones) == 0:
             return
 
         self.turn_in_progress = True
-        vis = self.vis
-
         self.link_usage = {}
 
-        vis.turn_count += 1
-        vis.title_label.config(text=f"Turn {vis.turn_count}")
+        moves = self.move_drones()
 
-        print(f"\n[bold cyan]Turn [/bold cyan]{vis.turn_count}")
-        moves = self.move_drones(self.drones)
         if moves:
+            vis = self.vis
+            vis.turn_count += 1
+            vis.title_label.config(text=f"Turn {vis.turn_count}")
+            print(f"\n[bold cyan]Turn [/bold cyan]{vis.turn_count}")
             print("[bold red] | [/bold red]".join(moves))
-        self.wait_for_animations()
+            self.wait_for_animations()
+        else:
+            self.turn_in_progress = False
 
     def toggle_mode(self, event: object):
         self.manual_mode = not self.manual_mode
@@ -176,11 +148,13 @@ class Simulation:
             self.on_key_n(None)
 
     def step(self) -> None:
-        if len(self.drones) == 0:
+        if len(self.d_map.drones) == 0:
             return
 
-        self.link_usage = {}
-        self.wait_for_animations()
+        if not self.manual_mode:
+            self.on_key_n(None)
+        else:
+            self.wait_for_animations()
 
     def reset(self, event: object = None):
         v = self.vis
@@ -193,7 +167,7 @@ class Simulation:
         for zone in self.d_map.zones.values():
             zone.count_drones = 0
 
-        self.drones.clear()
+        self.d_map.drones.clear()
 
         self.link_usage = {}
 
@@ -202,7 +176,7 @@ class Simulation:
         v.draw_connections()
         v.draw_zones()
 
-        self.drones += v.draw_drones()
+        v.draw_drones()
 
     def run(self) -> None:
         v = self.vis
@@ -213,8 +187,11 @@ class Simulation:
 
         v.draw_connections()
         v.draw_zones()
+        v.draw_drones()
 
-        self.drones += v.draw_drones()
+        for (_, d) in self.d_map.drones.items():
+            if d.path and d.path[0] == d.curr_zone:
+                d.path.pop(0)
 
         v.root.after(500, self.step)
         v.root.mainloop()
