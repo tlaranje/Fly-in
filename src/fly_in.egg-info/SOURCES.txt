@@ -10,6 +10,7 @@ src/Parsing/validators.py
 src/Simulation/__init__.py
 src/Simulation/drone.py
 src/Simulation/simulation.py
+src/Simulation/v2.py
 src/Simulation/visualizer.py
 src/fly_in.egg-info/PKG-INFO
 src/fly_in.egg-info/SOURCES.txt

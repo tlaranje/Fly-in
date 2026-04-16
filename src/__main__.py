@@ -1,10 +1,9 @@
 from src.Simulation import Simulation, Visualizer
 from src.Parsing import MapParser, DroneMap
-from src.Graph import Dijkstra
 from pydantic import ValidationError
+from src.Graph import Dijkstra
 from rich import print
 import traceback
-import pygame
 import sys
 
 
@@ -14,7 +13,7 @@ def main() -> None:
         map_parser = MapParser()
         d_map: DroneMap = map_parser.parse(sys.argv[1])
         d = Dijkstra(d_map)
-        results, total_turns = d.solve()
+        d.solve()
         v = Visualizer(d_map)
         s = Simulation(d_map, v, d)
         s.run()
@@ -28,21 +27,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-
-    # Initialize Pygame
-    pygame.init()
-
-    # Set up the game window
-    screen = pygame.display.set_mode((400, 300))
-    pygame.display.set_caption("Hello Pygame")
-
-    # Game loop
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-    # Quit Pygame
-    pygame.quit()
-    # main()
+    main()

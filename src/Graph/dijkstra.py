@@ -22,25 +22,25 @@ class Dijkstra():
         return link_usage < conn.max_link_capacity
 
     def is_zone_available(self, zone: str, turn: int) -> bool:
-        z = self.d_map.zones[zone]
+        z, r = self.d_map.zones[zone]
         zone_usage = self.reservations.get((z.name, turn), 0)
         return zone_usage < z.max_drones
 
     def solve(self) -> tuple[dict[int, list[str]], int]:
         turns_result: dict[int, list[str]] = {}
-        start = self.d_map.start_zone.name
-        end = self.d_map.end_zone.name
+        start = self.d_map.start_zone[0].name
+        end = self.d_map.end_zone[0].name
         path: list[str] = []
         total_turns: int = 0
 
-        for (d_id, d) in self.d_map.drones.items():
-            path = self.find_path(start, end, d_id)
+        for (d, d_rect) in self.d_map.drones.values():
+            path = self.find_path(start, end, d.drone_id)
             if path:
                 d.path = path
                 self.apply_reservations(path)
-                turns_result[d_id] = path
+                turns_result[d.drone_id] = path
             else:
-                turns_result[d_id] = [start]
+                turns_result[d.drone_id] = [start]
                 d.path = [start]
 
         for t in turns_result.values():
@@ -72,12 +72,12 @@ class Dijkstra():
                     continue
 
                 next_zone = z2 if z1 == curr_zone else z1
-                zone_type = zone[next_zone].zone_type
+                zone_type = zone[next_zone][0].zone_type
 
                 if zone_type == ZT.BLOCKED:
                     continue
 
-                travel_cost = zone[next_zone].zone_type.cost
+                travel_cost = zone[next_zone][0].zone_type.cost
                 arrivel_turn = travel_cost + turn
                 zone_cost = float(travel_cost)
 
@@ -111,7 +111,7 @@ class Dijkstra():
         return None
 
     def apply_reservations(self, path: list[str]) -> None:
-        start_zone = self.d_map.zones["start"]
+        start_zone = self.d_map.zones["start"][0]
         self.reservations[(start_zone.name, 0)] = (
             self.reservations.get((start_zone.name, 0), 0) + 1
         )
@@ -127,7 +127,7 @@ class Dijkstra():
                 next_name = path[i + 1]
                 if next_name not in self.d_map.zones:
                     break
-            next_zone = self.d_map.zones[next_name]
+            next_zone = self.d_map.zones[next_name][0]
             move_cost = next_zone.zone_type.cost
             conn = self.d_map.connections.get(
                 "-".join(sorted([prev_zone, next_name])), None
@@ -146,7 +146,7 @@ class Dijkstra():
             else:
                 i += 1
 
-        arrival_name = self.d_map.zones[path[-1]].name
+        arrival_name = self.d_map.zones[path[-1]][0].name
         for future_t in range(turn + 1, turn + 11):
             self.reservations[(arrival_name, future_t)] = (
                 self.reservations.get((arrival_name, future_t), 0) + 1)

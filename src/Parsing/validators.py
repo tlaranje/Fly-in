@@ -32,6 +32,7 @@ class Zone(BaseModel):
     color: Optional[str] = None
     max_drones: int = 1
     canva_id: int = 0
+    count_drones: int = 0
 
     @model_validator(mode="before")
     @classmethod
@@ -117,10 +118,10 @@ class Connection(BaseModel):
 
 class DroneMap(BaseModel):
     nb_drones: int
-    drones: dict[int, Drone]
-    start_zone: Zone
-    end_zone: Zone
-    zones: dict[str, Zone]
+    drones: dict[int, tuple[Drone, Any]]
+    start_zone: tuple[Zone, Any]
+    end_zone: tuple[Zone, Any]
+    zones: dict[str, tuple[Zone, Any]]
     connections: dict[str, Connection]
 
     @model_validator(mode="before")
@@ -140,10 +141,7 @@ class DroneMap(BaseModel):
     @model_validator(mode="after")
     def check_unique_names(self) -> Self:
         errors = ["DroneMap errors:"]
-        # for z in [self.start_hub, self.end_hub] + self.zones:
-        # self.zones[z.name] = z
         names = [z for z in self.zones]
-        # print([(z.name, _) for z in self.zones.items()])
 
         if len(names) != len(set(names)):
             errors.append("Zone names must be unique")

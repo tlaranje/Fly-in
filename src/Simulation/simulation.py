@@ -1,197 +1,184 @@
 from typing import TYPE_CHECKING
-from rich import print
+from rich import print as rprint
+import pygame
 import os
 
 if TYPE_CHECKING:
-    from src.Simulation.visualizer import Visualizer
-    from src.Simulation.drone import Drone
+    from src.Simulation import Visualizer
     from src.Parsing import DroneMap
     from src.Graph import Dijkstra
 
 
 class Simulation:
     def __init__(
-            self, d_map: "DroneMap", vis: "Visualizer", dijkstra: "Dijkstra"
+        self, d_map: "DroneMap", vis: "Visualizer", dijkstra: "Dijkstra"
     ) -> None:
         self.d_map = d_map
-        self.vis = vis
+        self.visualizer = vis
         self.link_usage: dict = {}
         self.dijkstra = dijkstra
         self.turn_in_progress = False
         self.manual_mode = True
         self.paths: list[list[str]] = [[]]
 
-    def animate_drone(
-        self, drone: "Drone", x: float, y: float, on_complete=None
-    ) -> None:
-        coords = self.vis.canvas.coords(drone.canva_id)
-        if not coords:
-            drone.is_moving = False
+    def animate_drone(self, drone_id: int) -> None:
+        v = self.visualizer
+        d_data = self.d_map.drones.get(drone_id)
+        if not d_data:
             return
 
-        cur_x = (coords[0] + coords[2]) / 2
-        cur_y = (coords[1] + coords[3]) / 2
-        dx = x - cur_x
-        dy = y - cur_y
+        d_obj, d_rect = d_data
+
+        dest_x = (d_obj.target_x - v.offset_x) * v.scale + v.margin
+        dest_y = (d_obj.target_y - v.offset_y) * v.scale + v.margin
+
+        dx = dest_x - d_rect.centerx
+        dy = dest_y - d_rect.centery
         distance = (dx**2 + dy**2) ** 0.5
+
         step = 5
 
         if distance <= step:
-            self.vis.canvas.move(drone.drone_tag, dx, dy)
-            drone.is_moving = False
-            if on_complete:
-                on_complete()
-            return
-
-        move_x = dx / distance * step
-        move_y = dy / distance * step
-        self.vis.canvas.move(drone.drone_tag, move_x, move_y)
-        self.vis.root.after(
-            16, lambda: self.animate_drone(drone, x, y, on_complete)
-        )
+            d_rect.center = (dest_x, dest_y)
+            d_obj.is_moving = False
+        else:
+            d_obj.is_moving = True
+            d_rect.centerx += (dx / distance) * step
+            d_rect.centery += (dy / distance) * step
 
     def move_drones(self) -> list[str]:
-        end = self.d_map.end_zone.name
-        turn_moves: list[str] = []
-        v = self.vis
+        ez = self.d_map.end_zone
+        end_name = ez[0].name if isinstance(ez, (list, tuple)) else ez.name
 
-        for (d_id, d) in list(self.d_map.drones.items()):
-            if not d.path:
+        turn_moves: list[str] = []
+
+        for d_obj, d_rect in self.d_map.drones.values():
+            if not d_obj.path:
                 continue
 
-            next_step = d.path.pop(0)
-            dest_x, dest_y = 0.0, 0.0
+            if d_obj.is_moving:
+                continue
+
+            next_step = d_obj.path.pop(0)
 
             if next_step in self.d_map.zones:
-                nz = self.d_map.zones[next_step]
-                dest_x = nz.x
-                dest_y = nz.y
+                nz, _ = self.d_map.zones[next_step]
+                d_obj.target_x = nz.x
+                d_obj.target_y = nz.y
+                d_obj.is_moving = True
 
                 color = (
-                    "blue"
-                    if nz.zone_type.name.lower() == "restricted" else
-                    "green"
+                    "blue" if nz.zone_type.name.lower() == "restricted"
+                    else "green"
                 )
                 turn_moves.append(
-                    f"[bold {color}]D{d.drone_id}-{next_step}[/bold {color}]"
+                    f"[bold {color}]D{d_obj.drone_id}-"
+                    f"{next_step}[/bold {color}]"
                 )
-                d.curr_zone = next_step
+                d_obj.curr_zone = next_step
+
+                if next_step == end_name:
+                    d_obj.should_die = True
 
             elif next_step in self.d_map.connections:
                 conn = self.d_map.connections[next_step]
-                z1 = self.d_map.zones[conn.zone1]
-                z2 = self.d_map.zones[conn.zone2]
+                z1, _ = self.d_map.zones[conn.zone1]
+                z2, _ = self.d_map.zones[conn.zone2]
 
-                dest_x = (z1.x + z2.x) / 2
-                dest_y = (z1.y + z2.y) / 2
+                d_obj.target_x = (z1.x + z2.x) / 2
+                d_obj.target_y = (z1.y + z2.y) / 2
+                d_obj.is_moving = True
+
+                clean_conn = "->".join(sorted(next_step.split('-')))
                 turn_moves.append(
-                    f"[bold yellow]D{d.drone_id}-"
-                    f"{"->".join(sorted(next_step.split('-')))}[/bold yellow]"
+                    f"[bold yellow]D{d_obj.drone_id}-"
+                    f"{clean_conn}[/bold yellow]"
                 )
-
-            cx = (dest_x - v.min_x) * v.scale + v.margin
-            cy = (dest_y - v.min_y) * v.scale + v.margin
-
-            if next_step == end:
-                def on_arrive(drone=d):
-                    drone.is_moving = False
-                    if drone.drone_id in self.d_map.drones:
-                        del self.d_map.drones[drone.drone_id]
-                        self.vis.canvas.delete(drone.drone_tag)
-
-                d.is_moving = True
-                self.animate_drone(d, cx, cy, on_complete=on_arrive)
-            else:
-                d.is_moving = True
-                self.animate_drone(d, cx, cy)
 
         return turn_moves
 
-    def wait_for_animations(self) -> None:
-        drones_list = list(self.d_map.drones.values())
-        any_moving = any(getattr(d, 'is_moving', False) for d in drones_list)
+    def update(self) -> None:
+        any_moving = False
+        to_remove = []
 
-        if any_moving:
-            self.vis.root.after(16, self.wait_for_animations)
-        else:
+        for d_id in list(self.d_map.drones.keys()):
+            d_data = self.d_map.drones.get(d_id)
+            if not d_data:
+                continue
+
+            d_obj, _ = d_data
+            if d_obj.is_moving:
+                self.animate_drone(d_id)
+                any_moving = True
+            elif getattr(d_obj, "should_die", False):
+                to_remove.append(d_id)
+
+        for d_id in to_remove:
+            if d_id in self.d_map.drones:
+                del self.d_map.drones[d_id]
+
+        if not any_moving and self.turn_in_progress:
             self.turn_in_progress = False
-            if self.d_map.drones:
-                if not self.manual_mode:
-                    self.vis.root.after(100, lambda: self.on_key_n(None))
+            if not self.manual_mode and self.d_map.drones:
+                self.on_turn_request()
 
-    def on_key_n(self, event: object):
-        if self.turn_in_progress:
-            return
-
-        if len(self.d_map.drones) == 0:
+    def on_turn_request(self) -> None:
+        if any(d.is_moving for d, _ in self.d_map.drones.values()):
             return
 
         self.turn_in_progress = True
-        self.link_usage = {}
-
         moves = self.move_drones()
 
         if moves:
-            vis = self.vis
-            vis.turn_count += 1
-            vis.title_label.config(text=f"Turn {vis.turn_count}")
-            print(f"\n[bold cyan]Turn [/bold cyan]{vis.turn_count}")
-            print("[bold red] | [/bold red]".join(moves))
-            self.wait_for_animations()
+            self.visualizer.turn_count += 1
+            rprint(
+                f"\n[bold cyan]Turn [/bold cyan]{self.visualizer.turn_count}"
+            )
+            rprint("[bold red] | [/bold red]".join(moves))
         else:
             self.turn_in_progress = False
 
-    def toggle_mode(self, event: object):
-        self.manual_mode = not self.manual_mode
-
-        if not self.manual_mode and not self.turn_in_progress:
-            self.on_key_n(None)
-
-    def step(self) -> None:
-        if len(self.d_map.drones) == 0:
-            return
-
-        if not self.manual_mode:
-            self.on_key_n(None)
-        else:
-            self.wait_for_animations()
-
-    def reset(self, event: object = None):
-        v = self.vis
+    def reset(self) -> None:
+        v = self.visualizer
         os.system("clear")
-        v.canvas.delete("all")
-
         v.turn_count = 0
-        v.title_label.config(text="Turn 0")
-
-        for zone in self.d_map.zones.values():
-            zone.count_drones = 0
-
+        for zone_tuple in self.d_map.zones.values():
+            zone_obj = zone_tuple[0]
+            zone_obj.count_drones = 0
         self.d_map.drones.clear()
-
-        self.link_usage = {}
-
         self.turn_in_progress = False
 
-        v.draw_connections()
-        v.draw_zones()
-
-        v.draw_drones()
-
     def run(self) -> None:
-        v = self.vis
+        v = self.visualizer
+        v.setup_window()
+        v.setup_assets()
 
-        v.root.bind("m", self.toggle_mode)
-        v.root.bind("n", self.on_key_n)
-        v.root.bind("r", self.reset)
+        clock = pygame.time.Clock()
+        running = True
 
-        v.draw_connections()
-        v.draw_zones()
-        v.draw_drones()
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_n:
+                        self.on_turn_request()
+                    if event.key == pygame.K_m:
+                        self.manual_mode = not self.manual_mode
+                        if not self.manual_mode and not self.turn_in_progress:
+                            self.on_turn_request()
+                    if event.key == pygame.K_r:
+                        self.reset()
 
-        for (_, d) in self.d_map.drones.items():
-            if d.path and d.path[0] == d.curr_zone:
-                d.path.pop(0)
+            self.update()
 
-        v.root.after(500, self.step)
-        v.root.mainloop()
+            v.screen.fill((50, 50, 50))
+            if hasattr(v, "zones_layer"):
+                v.screen.blit(v.zones_layer, (0, 0))
+
+            v.draw_drones()
+
+            pygame.display.flip()
+            clock.tick(60)
+
+        pygame.quit()

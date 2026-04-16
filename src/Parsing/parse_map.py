@@ -11,9 +11,7 @@ class MapParser:
         temp_data: list[str] = data.split(' ')
         metadata: dict[str, Any] = {}
         for d in temp_data:
-            if d.endswith("rainbow"):
-                metadata[d.split('=')[0]] = "green"
-            elif '=' in d:
+            if '=' in d:
                 metadata[d.split('=')[0]] = d.split('=')[1]
 
         return metadata
@@ -38,7 +36,8 @@ class MapParser:
                 if line.startswith("nb_drones"):
                     map_data["nb_drones"] = int(line.split(':')[1].strip())
                     for i in range(map_data["nb_drones"]):
-                        map_data["drones"][i + 1] = Drone(drone_id=i + 1)
+                        drone_obj = Drone(drone_id=i + 1)
+                        map_data["drones"][i + 1] = (drone_obj, 0)
 
                 if ":" in line and not line.startswith("connection"):
                     ZONE_PATTERN = re.compile(r"""
@@ -70,13 +69,13 @@ class MapParser:
 
                         prefix = line.split(':')[0]
                         if prefix == "start_hub":
-                            map_data["zones"][zone.name] = zone
-                            map_data["start_zone"] = zone
+                            map_data["zones"][zone.name] = (zone, 0)
+                            map_data["start_zone"] = (zone, 0)
                         elif prefix == "end_hub":
-                            map_data["zones"][zone.name] = zone
-                            map_data["end_zone"] = zone
+                            map_data["zones"][zone.name] = (zone, 0)
+                            map_data["end_zone"] = (zone, 0)
                         elif prefix == "hub":
-                            map_data["zones"][zone.name] = zone
+                            map_data["zones"][zone.name] = (zone, 0)
                 if ":" in line and line.startswith("connection"):
                     CONN_PATTERN = re.compile(r"""
                         ^connection:    # line starts with connection:
