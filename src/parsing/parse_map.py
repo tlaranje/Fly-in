@@ -1,5 +1,4 @@
-from src.Parsing.validators import DroneMap, Zone, Connection
-from src.Simulation import Drone
+from src.core import DroneMap, Zone, Connection, Drone
 from typing import Any
 import re
 
@@ -36,8 +35,8 @@ class MapParser:
                 if line.startswith("nb_drones"):
                     map_data["nb_drones"] = int(line.split(':')[1].strip())
                     for i in range(map_data["nb_drones"]):
-                        drone_obj = Drone(drone_id=i + 1)
-                        map_data["drones"][i + 1] = (drone_obj, 0)
+                        drone_obj = Drone(drone_id=i)
+                        map_data["drones"][i] = (drone_obj, 0)
 
                 if ":" in line and not line.startswith("connection"):
                     ZONE_PATTERN = re.compile(r"""

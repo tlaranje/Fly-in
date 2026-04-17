@@ -5,8 +5,8 @@ import os
 
 if TYPE_CHECKING:
     from src.Simulation import Visualizer
-    from src.Parsing import DroneMap
-    from src.Graph import Dijkstra
+    from src.dijkstra import Dijkstra
+    from src.core import DroneMap
 
 
 class Simulation:
@@ -141,12 +141,23 @@ class Simulation:
     def reset(self) -> None:
         v = self.visualizer
         os.system("clear")
+
         v.turn_count = 0
-        for zone_tuple in self.d_map.zones.values():
-            zone_obj = zone_tuple[0]
-            zone_obj.count_drones = 0
-        self.d_map.drones.clear()
         self.turn_in_progress = False
+
+        for zone_tuple in self.d_map.zones.values():
+            zone_tuple[0].count_drones = 0
+
+        self.d_map.drones.clear()
+        for i in range(self.d_map.nb_drones):
+            from src.core import Drone
+            self.d_map.drones[i + 1] = (Drone(drone_id=i + 1), 0)
+
+        self.dijkstra.reservations.clear()
+        self.dijkstra.reservations_links.clear()
+        self.dijkstra.solve()
+
+        v.create_drones()
 
     def run(self) -> None:
         v = self.visualizer
@@ -173,12 +184,14 @@ class Simulation:
             self.update()
 
             v.screen.fill((50, 50, 50))
+
             if hasattr(v, "zones_layer"):
                 v.screen.blit(v.zones_layer, (0, 0))
 
             v.draw_drones()
+            v.draw_ui()
+            v.draw_tooltip()
 
             pygame.display.flip()
             clock.tick(60)
-
         pygame.quit()

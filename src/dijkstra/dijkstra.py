@@ -1,9 +1,9 @@
 from typing import Any, TYPE_CHECKING
-from src.Parsing import Zone_Types as ZT
+from src.core import ZoneTypes as ZT
 import heapq
 
 if TYPE_CHECKING:
-    from src.Parsing import DroneMap
+    from src.core import DroneMap
 
 
 class Dijkstra():
@@ -36,7 +36,7 @@ class Dijkstra():
         for (d, d_rect) in self.d_map.drones.values():
             path = self.find_path(start, end, d.drone_id)
             if path:
-                d.path = path
+                d.path = path[1:]
                 self.apply_reservations(path)
                 turns_result[d.drone_id] = path
             else:
