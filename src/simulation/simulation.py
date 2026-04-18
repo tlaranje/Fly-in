@@ -4,7 +4,7 @@ import pygame
 import os
 
 if TYPE_CHECKING:
-    from src.Simulation import Visualizer
+    from src.visualizer import Visualizer
     from src.dijkstra import Dijkstra
     from src.core import DroneMap
 
@@ -171,13 +171,19 @@ class Simulation:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+
                     if event.key == pygame.K_n:
                         self.on_turn_request()
+
                     if event.key == pygame.K_m:
                         self.manual_mode = not self.manual_mode
                         if not self.manual_mode and not self.turn_in_progress:
                             self.on_turn_request()
+
                     if event.key == pygame.K_r:
                         self.reset()
 
@@ -194,4 +200,3 @@ class Simulation:
 
             pygame.display.flip()
             clock.tick(60)
-        pygame.quit()
