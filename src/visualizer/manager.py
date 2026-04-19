@@ -81,10 +81,6 @@ class Manager:
         )
         self.active_map_buttons: list[Button] = []
 
-    # ------------------------------------------------------------------
-    # Setup helpers
-    # ------------------------------------------------------------------
-
     def scan_maps_folder(self) -> dict[str, list[tuple[str, str]]]:
         """
         Scans the ``maps/`` directory tree for ``.txt`` map files.
@@ -144,10 +140,6 @@ class Manager:
         Button.win_size = self.win_size
         self.screen = pygame.display.set_mode(self.win_size)
 
-    # ------------------------------------------------------------------
-    # Simulation launch
-    # ------------------------------------------------------------------
-
     def load_and_start_simulation(self, map_path: str | None) -> None:
         """
         Parses a map file, runs Dijkstra and starts the simulation.
@@ -182,10 +174,6 @@ class Manager:
             self.update_display_mode(*self.win_size)
             pygame.display.set_caption("Fly-in")
 
-    # ------------------------------------------------------------------
-    # Map selection screen
-    # ------------------------------------------------------------------
-
     def create_map_screen(self) -> None:
         """
         Builds the list of map buttons for the selected difficulty tier.
@@ -209,10 +197,6 @@ class Manager:
                     color=(60, 60, 60), action=map_path
                 )
             )
-
-    # ------------------------------------------------------------------
-    # Event handlers
-    # ------------------------------------------------------------------
 
     def handle_menu_events(
         self,
@@ -277,10 +261,6 @@ class Manager:
                 self.state = 'MAIN_MENU'
                 self.update_display_mode(300, 270)
 
-    # ------------------------------------------------------------------
-    # Drawing
-    # ------------------------------------------------------------------
-
     def draw_main_menu(self, mouse: tuple[int, int]) -> None:
         """
         Renders the main menu title and buttons.
@@ -323,10 +303,6 @@ class Manager:
         else:
             for m_btn in self.active_map_buttons:
                 m_btn.draw(self.screen, self.small_font, mouse)
-
-    # ------------------------------------------------------------------
-    # Main loop
-    # ------------------------------------------------------------------
 
     def run(self) -> None:
         """

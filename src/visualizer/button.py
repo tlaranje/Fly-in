@@ -57,10 +57,6 @@ class Button:
         self.rect: pygame.Rect = pygame.Rect(0, 0, size[0], size[1])
         self.setup_button()
 
-    # ------------------------------------------------------------------
-    # Layout
-    # ------------------------------------------------------------------
-
     def setup_button(self) -> None:
         """
         Recomputes rect.topleft from pos and the current win_size.
@@ -75,10 +71,6 @@ class Button:
         pos_x: int = (win_x // 2) - (self.size[0] // 2) if x is None else x
         pos_y: int = (win_y // 2) - (self.size[1] // 2) if y is None else y
         self.rect.topleft = (pos_x, pos_y)
-
-    # ------------------------------------------------------------------
-    # Drawing
-    # ------------------------------------------------------------------
 
     def draw_gradient(
         self,
@@ -175,10 +167,6 @@ class Button:
             draw_rect.center,
             thickness=1,
         )
-
-    # ------------------------------------------------------------------
-    # Interaction
-    # ------------------------------------------------------------------
 
     def is_clicked(
         self,
