@@ -159,6 +159,15 @@ class Simulation:
         any_moving: bool = False
         to_remove: list[int] = []
 
+        v = self.visualizer
+
+        v.drone_frame_timer += 1
+        if v.drone_frame_timer >= v.drone_frame_interval:
+            v.drone_frame_timer = 0
+            v.drone_frame_index = (
+                (v.drone_frame_index + 1) % len(v.drone_frames)
+            )
+
         for d_id in list(self.d_map.drones.keys()):
             d_data = self.d_map.drones.get(d_id)
             if not d_data:

@@ -28,7 +28,6 @@ def main() -> None:
         rprint("[bold red]Erro inesperado:[/bold red]")
 
     finally:
-        # Always quit pygame cleanly, even if an exception was raised
         pygame.quit()
 
 

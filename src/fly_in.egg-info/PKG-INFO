@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: fly_in
+Version: 0.0.1
+Summary: tlaranje's fly-in project (school 42)
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: flake8>=7.1.1
+Requires-Dist: mypy>=1.11.2
+Requires-Dist: pydantic>=2.8.2
+Requires-Dist: rich>=13.8.1
+Requires-Dist: pygame-ce<=2.5.7

@@ -66,6 +66,7 @@ class Visualizer(
         self.drone_img: "Surface"
         self.zone_img: "Surface"
         self.zones_layer: "Surface"
+
         # Assigned in setup_window()
         self.screen: "Surface"
 
@@ -84,3 +85,8 @@ class Visualizer(
         # Layout constants used by both window and UI mixins
         self.TURN_HEIGHT: int = 60
         self.INFO_HEIGHT: int = 165
+
+        self.drone_frames: list["Surface"] = []
+        self.drone_frame_index: int = 0
+        self.drone_frame_timer: int = 0
+        self.drone_frame_interval: int = 10

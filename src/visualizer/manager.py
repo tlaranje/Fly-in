@@ -1,12 +1,13 @@
+from .text_renderer import TextRenderer
+from src.simulation import Simulation
+from .visualizer import Visualizer
+from src.parsing import MapParser
+from src.dijkstra import Dijkstra
+from .button import Button
+from rich import print
 import pygame
 import sys
 import os
-from .text_renderer import TextRenderer
-from .button import Button
-from src.parsing import MapParser
-from src.dijkstra import Dijkstra
-from src.simulation import Simulation
-from .visualizer import Visualizer
 
 
 class Manager:
@@ -122,7 +123,10 @@ class Manager:
         for i, (label, action) in enumerate(difficulties):
             y_pos: int = 80 + (i * 80)
             self.difficulty_btms.append(
-                Button((None, y_pos), self.btm_size, label, action=action)
+                Button(
+                    (None, y_pos), self.btm_size, label, action=action,
+                    color=(50, 100, 150),
+                )
             )
 
     def center_window(self) -> None:
@@ -158,9 +162,7 @@ class Manager:
 
             dijkstra: Dijkstra = Dijkstra(d_map)
             dijkstra.solve()
-            print("D0", d_map.drones[0][0].path)
-            print("D1", d_map.drones[1][0].path)
-            # print("D2", d_map.drones[2][0].path)
+
             viz: Visualizer = Visualizer(d_map)
             sim: Simulation = Simulation(d_map, viz, dijkstra)
 
@@ -168,7 +170,9 @@ class Manager:
             sim.run()
 
         except Exception as e:
-            print(f"Erro ao carregar mapa {map_path}: {e}")
+            print(
+                f"[bold red]Erro ao carregar mapa {map_path}: {e}[/bold red]"
+            )
         finally:
             # Restore menu window after simulation exits
             self.update_display_mode(*self.win_size)

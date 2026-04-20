@@ -30,7 +30,14 @@ class RendererMixin:
             raw_drone.get_width() // 12,
             raw_drone.get_height() // 12,
         )
-        self.drone_img = pygame.transform.smoothscale(raw_drone, d_size)
+
+        self.drone_frames = []
+        for i in range(1, 6):
+            raw = pygame.image.load(f"imgs/drone_f{i}.png").convert_alpha()
+            d_size = (raw.get_width() // 8, raw.get_height() // 8)
+            self.drone_frames.append(pygame.transform.smoothscale(raw, d_size))
+
+        self.drone_img = self.drone_frames[0]
 
         raw_zone: "Surface" = pygame.image.load(
             "imgs/zone.png"
@@ -152,7 +159,8 @@ class RendererMixin:
 
     def draw_drones(self: VisualizerProtocol) -> None:
         """Draws all active drone sprites onto the main screen surface."""
+        current_frame = self.drone_frames[self.drone_frame_index]
         for _, drone_data in self.d_map.drones.items():
             _, d_rect = drone_data
             if d_rect is not None:
-                self.draw_img(self.drone_img, self.screen, d_rect.center)
+                self.draw_img(current_frame, self.screen, d_rect.center)

@@ -34,6 +34,7 @@ class Button:
         text: str,
         color: ColorLike = (50, 50, 50),
         hover_color: ColorLike = (70, 90, 230),
+        border_color: ColorLike = (255, 255, 255),
         action: str | None = None,
     ) -> None:
         """
@@ -53,6 +54,7 @@ class Button:
         self.text: str = text
         self.base_color: pygame.Color = pygame.Color(color)
         self.hover_color: pygame.Color = pygame.Color(hover_color)
+        self.border_color: pygame.Color = pygame.Color(border_color)
         self.action_value: str | None = action
         self.rect: pygame.Rect = pygame.Rect(0, 0, size[0], size[1])
         self.setup_button()
@@ -152,10 +154,11 @@ class Button:
         self.draw_gradient(screen, target_color, draw_rect, 12)
 
         border_color: tuple[int, int, int] = (
-            (255, 255, 255) if is_hover else (200, 200, 200)
+            (255, 255, 255) if is_hover else self
         )
+
         pygame.draw.rect(
-            screen, border_color, draw_rect, 2, border_radius=12
+            screen, self.border_color, draw_rect, 2, border_radius=12
         )
 
         TextRenderer.draw_with_outline(

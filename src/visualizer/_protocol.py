@@ -40,6 +40,12 @@ class VisualizerProtocol(Protocol):
     # --- State ---
     turn_count: int
 
+    # --- Drone Frames ---
+    drone_frames: list["Surface"]
+    drone_frame_index: int
+    drone_frame_timer: int
+    drone_frame_interval: int
+
     # --- Window mixin ---
     def setup_window(self) -> None: ...
     def sx(self, world_x: float) -> float: ...
