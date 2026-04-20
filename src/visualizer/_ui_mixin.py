@@ -142,7 +142,7 @@ class UIMixin:
         # Coloured left accent bar.
         pygame.draw.rect(
             self.screen, accent_color,
-            (left_x - 12, panel_rect.top + 15, 4, 80),
+            (left_x - 12, panel_rect.top + 15, 4, self.INFO_HEIGHT - 30),
             border_radius=2,
         )
 
@@ -197,7 +197,7 @@ class UIMixin:
         # Coloured accent bar for the right column.
         pygame.draw.rect(
             self.screen, kb_color,
-            (right_x - 12, panel_rect.top + 15, 4, 80),
+            (right_x - 12, panel_rect.top + 15, 4, self.INFO_HEIGHT - 30),
             border_radius=2,
         )
 

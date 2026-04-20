@@ -24,7 +24,7 @@ class RendererMixin:
         change at runtime.
         """
         raw_drone: "Surface" = pygame.image.load(
-            "imgs/drone.png"
+            "imgs/drone_f0.png"
         ).convert_alpha()
         d_size: tuple[int, int] = (
             raw_drone.get_width() // 12,
@@ -32,9 +32,9 @@ class RendererMixin:
         )
 
         self.drone_frames = []
-        for i in range(1, 6):
+        for i in range(16):
             raw = pygame.image.load(f"imgs/drone_f{i}.png").convert_alpha()
-            d_size = (raw.get_width() // 8, raw.get_height() // 8)
+            d_size = (raw.get_width() // 5, raw.get_height() // 5)
             self.drone_frames.append(pygame.transform.smoothscale(raw, d_size))
 
         self.drone_img = self.drone_frames[0]
@@ -163,4 +163,6 @@ class RendererMixin:
         for _, drone_data in self.d_map.drones.items():
             _, d_rect = drone_data
             if d_rect is not None:
-                self.draw_img(current_frame, self.screen, d_rect.center)
+                x, y = d_rect.center
+                center = (x, y - 4)
+                self.draw_img(current_frame, self.screen, center)

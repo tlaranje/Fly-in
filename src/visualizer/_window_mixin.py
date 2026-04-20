@@ -11,7 +11,7 @@ class WindowMixin:
         MIN_WIDTH: Minimum window width so the info panel always fits.
     """
 
-    MIN_WIDTH: int = 1000
+    MIN_WIDTH: int = 1013
 
     def setup_window(self: VisualizerProtocol) -> None:
         """

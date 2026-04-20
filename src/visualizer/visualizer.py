@@ -84,9 +84,9 @@ class Visualizer(
 
         # Layout constants used by both window and UI mixins
         self.TURN_HEIGHT: int = 60
-        self.INFO_HEIGHT: int = 165
+        self.INFO_HEIGHT: int = 155
 
         self.drone_frames: list["Surface"] = []
         self.drone_frame_index: int = 0
         self.drone_frame_timer: int = 0
-        self.drone_frame_interval: int = 10
+        self.drone_frame_interval: int = 2

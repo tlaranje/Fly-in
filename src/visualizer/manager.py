@@ -56,12 +56,10 @@ class Manager:
 
         self.menu_buttons: list[Button] = [
             Button(
-                (None, 110), self.btm_size, "Play",
-                action="START_MAP_SELECT"
+                (None, 110), self.btm_size, "Play", action="START_MAP_SELECT"
             ),
             Button(
-                (None, 190), self.btm_size, "Exit",
-                action="QUIT_APP"
+                (None, 190), self.btm_size, "Exit", action="QUIT_APP"
             ),
         ]
 
@@ -124,8 +122,7 @@ class Manager:
             y_pos: int = 80 + (i * 80)
             self.difficulty_btms.append(
                 Button(
-                    (None, y_pos), self.btm_size, label, action=action,
-                    color=(50, 100, 150),
+                    (None, y_pos), self.btm_size, label, action=action
                 )
             )
 
@@ -143,17 +140,11 @@ class Manager:
         self.win_size = (width, height)
         Button.win_size = self.win_size
         self.screen = pygame.display.set_mode(self.win_size)
+        pygame.event.post(
+            pygame.event.Event(pygame.ACTIVEEVENT, gain=1, state=1)
+        )
 
     def load_and_start_simulation(self, map_path: str | None) -> None:
-        """
-        Parses a map file, runs Dijkstra and starts the simulation.
-
-        Blocks until the simulation window is closed, then reclaims the
-        menu window dimensions.
-
-        Args:
-            map_path: Absolute or relative path to the ``.txt`` map file.
-        """
         assert map_path is not None
 
         try:
@@ -166,7 +157,6 @@ class Manager:
             viz: Visualizer = Visualizer(d_map)
             sim: Simulation = Simulation(d_map, viz, dijkstra)
 
-            # Blocks until the user closes the simulation
             sim.run()
 
         except Exception as e:
@@ -174,9 +164,9 @@ class Manager:
                 f"[bold red]Erro ao carregar mapa {map_path}: {e}[/bold red]"
             )
         finally:
-            # Restore menu window after simulation exits
             self.update_display_mode(*self.win_size)
             pygame.display.set_caption("Fly-in")
+            pygame.event.clear()
 
     def create_map_screen(self) -> None:
         """
@@ -196,10 +186,7 @@ class Manager:
         for i, (map_name, map_path) in enumerate(maps):
             y_pos: int = 80 + (i * 70)
             self.active_map_buttons.append(
-                Button(
-                    (None, y_pos), (300, 50), map_name,
-                    color=(60, 60, 60), action=map_path
-                )
+                Button((None, y_pos), (300, 50), map_name, action=map_path)
             )
 
     def handle_menu_events(

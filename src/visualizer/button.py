@@ -32,29 +32,21 @@ class Button:
         pos: tuple[int | None, int | None],
         size: tuple[int, int],
         text: str,
-        color: ColorLike = (50, 50, 50),
-        hover_color: ColorLike = (70, 90, 230),
+        color: ColorLike = (20, 100, 155),
+        hover_color: ColorLike = (30, 160, 160),
         border_color: ColorLike = (255, 255, 255),
+        border_size: int = 3,
+        round_size: int = 25,
         action: str | None = None,
     ) -> None:
-        """
-        Creates a button and computes its initial screen position.
-
-        Args:
-            pos: (x, y) screen position. Pass None on either axis to
-                centre the button on that axis using win_size.
-            size: Button (width, height) in pixels.
-            text: Label to display on the button.
-            color: Idle background colour. Defaults to dark grey.
-            hover_color: Background colour on mouse hover.
-            action: String identifier returned to the caller on click.
-        """
         self.pos: tuple[int | None, int | None] = pos
         self.size: tuple[int, int] = size
         self.text: str = text
         self.base_color: pygame.Color = pygame.Color(color)
         self.hover_color: pygame.Color = pygame.Color(hover_color)
         self.border_color: pygame.Color = pygame.Color(border_color)
+        self.border_size: int = border_size
+        self.round_size: int = round_size
         self.action_value: str | None = action
         self.rect: pygame.Rect = pygame.Rect(0, 0, size[0], size[1])
         self.setup_button()
@@ -74,100 +66,58 @@ class Button:
         pos_y: int = (win_y // 2) - (self.size[1] // 2) if y is None else y
         self.rect.topleft = (pos_x, pos_y)
 
-    def draw_gradient(
-        self,
-        surface: pygame.Surface,
-        color: pygame.Color,
-        rect: pygame.Rect,
-        radius: int,
-    ) -> None:
-        """
-        Draws a gradient fill clipped to a rounded rectangle.
-
-        Creates a temporary SRCALPHA surface, fills it row-by-row with a
-        slightly darker shade towards the bottom, then masks it with a
-        rounded rectangle before blitting onto *surface*.
-
-        Args:
-            surface: Destination surface.
-            color: Base colour for the top of the gradient.
-            rect: Area and position to fill.
-            radius: Corner radius for the rounded rectangle mask.
-        """
-        fill_surf: pygame.Surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-
-        for i in range(rect.height):
-            # Darken by up to 15 % towards the bottom
-            factor: float = 1.0 - (i / rect.height) * 0.15
-            row_color: tuple[int, int, int] = (
-                int(color.r * factor),
-                int(color.g * factor),
-                int(color.b * factor),
-            )
-            pygame.draw.line(fill_surf, row_color, (0, i), (rect.width, i))
-
-        # Clip gradient to the rounded-rect shape using a white alpha mask
-        mask: pygame.Surface = pygame.Surface(rect.size, pygame.SRCALPHA)
-        pygame.draw.rect(
-            mask, (255, 255, 255), (0, 0, *rect.size), border_radius=radius
-        )
-        fill_surf.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        surface.blit(fill_surf, rect.topleft)
-
     def draw(
         self,
         screen: pygame.Surface,
         font: pygame.font.Font,
         mouse_pos: tuple[int, int],
     ) -> None:
-        """
-        Renders the button in its current hover/press state.
-
-        Draw order:
-        1. Glow halo (hover only).
-        2. Gradient fill.
-        3. Rounded border.
-        4. Outlined label text.
-
-        Args:
-            screen: Surface to draw onto.
-            font: Font used for the button label.
-            mouse_pos: Current mouse position for hover/press detection.
-        """
         is_hover: bool = self.rect.collidepoint(mouse_pos)
         is_pressed: bool = is_hover and pygame.mouse.get_pressed()[0]
 
         target_color: pygame.Color = (
             self.hover_color if is_hover else self.base_color
         )
-        # Shift the button down slightly when pressed for tactile feel
         offset: int = 2 if is_pressed else 0
+        draw_rect: pygame.Rect = self.rect.move(0, offset)
 
-        if is_hover:
-            # Soft glow halo behind the button
-            glow_color: tuple[int, ...] = (*target_color[:3], 60)
+        # Sombra deslocada (só aparece quando não está pressionado)
+        if not is_pressed:
+            shadow_rect: pygame.Rect = draw_rect.move(3, 4)
             pygame.draw.rect(
-                screen, glow_color, self.rect, border_radius=14
+                screen, (20, 20, 20), shadow_rect,
+                border_radius=self.round_size
             )
 
-        draw_rect: pygame.Rect = self.rect.move(0, offset)
-        self.draw_gradient(screen, target_color, draw_rect, 12)
+        # Glow no hover
+        if is_hover:
+            glow_color: tuple[int, ...] = (*target_color[:3], 60)
+            pygame.draw.rect(
+                screen, glow_color, self.rect,
+                border_radius=self.round_size + 2
+            )
 
-        border_color: tuple[int, int, int] = (
-            (255, 255, 255) if is_hover else self
-        )
-
+        # Botão principal
         pygame.draw.rect(
-            screen, self.border_color, draw_rect, 2, border_radius=12
+            screen, target_color, draw_rect,
+            border_radius=self.round_size
         )
 
+        # Borda
+        pygame.draw.rect(
+            screen, self.border_color, draw_rect,
+            self.border_size,
+            border_radius=self.round_size
+        )
+
+        x, y = draw_rect.center
         TextRenderer.draw_with_outline(
             screen,
             self.text,
             font,
             (255, 255, 255),
             (0, 0, 0),
-            draw_rect.center,
+            (x, y + 3),
             thickness=1,
         )
 

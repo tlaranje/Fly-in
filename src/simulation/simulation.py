@@ -45,17 +45,9 @@ class Simulation:
         self.manual_mode: bool = True
         self.link_usage: dict = {}
         self.paths: list[list[str]] = [[]]
+        self.drone_pos: dict[int, tuple[float, float]] = {}
 
     def animate_drone(self, drone_id: int) -> None:
-        """
-        Moves a drone sprite one step towards its target screen position.
-
-        Called every frame while a drone's ``is_moving`` flag is True.
-        When the sprite reaches the target it snaps and clears the flag.
-
-        Args:
-            drone_id: ID of the drone to animate.
-        """
         v: "VisualizerProtocol" = self.visualizer
         d_data = self.d_map.drones.get(drone_id)
         if not d_data:
@@ -63,25 +55,34 @@ class Simulation:
 
         d_obj, d_rect = d_data
 
-        # Convert world coordinates to screen coordinates
         dest_x: float = v.sx(d_obj.target_x)
         dest_y: float = v.sy(d_obj.target_y)
 
-        dx: float = dest_x - d_rect.centerx
-        dy: float = dest_y - d_rect.centery
+        # Inicializa posição float se ainda não existe
+        if drone_id not in self.drone_pos:
+            self.drone_pos[drone_id] = (
+                float(d_rect.centerx), float(d_rect.centery)
+            )
+
+        curr_x, curr_y = self.drone_pos[drone_id]
+
+        dx: float = dest_x - curr_x
+        dy: float = dest_y - curr_y
         distance: float = (dx ** 2 + dy ** 2) ** 0.5
 
-        # Pixels per frame the sprite travels
-        step: int = 5
+        step: float = 3.0  # podes usar float agora
 
         if distance <= step:
-            # Close enough — snap to exact position and stop
-            d_rect.center = (dest_x, dest_y)
+            curr_x, curr_y = dest_x, dest_y
             d_obj.is_moving = False
         else:
+            curr_x += (dx / distance) * step
+            curr_y += (dy / distance) * step
             d_obj.is_moving = True
-            d_rect.centerx += (dx / distance) * step
-            d_rect.centery += (dy / distance) * step
+
+        # Guarda float e só depois converte para o rect
+        self.drone_pos[drone_id] = (curr_x, curr_y)
+        d_rect.center = (int(curr_x), int(curr_y))
 
     def move_drones(self) -> list[str]:
         """
@@ -105,7 +106,6 @@ class Simulation:
                 continue
 
             next_step: str = d_obj.path.pop(0)
-
             if next_step in self.d_map.zones:
                 # --- Move to a zone ---
                 nz, _ = self.d_map.zones[next_step]
@@ -229,6 +229,7 @@ class Simulation:
 
         v.turn_count = 0
         self.turn_in_progress = False
+        self.drone_pos.clear()
 
         # Reset drone counters on every zone
         for zone_tuple in self.d_map.zones.values():
