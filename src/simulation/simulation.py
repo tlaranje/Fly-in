@@ -43,7 +43,6 @@ class Simulation:
         self.dijkstra: "Dijkstra" = dijkstra
         self.turn_in_progress: bool = False
         self.manual_mode: bool = True
-        self.link_usage: dict = {}
         self.paths: list[list[str]] = [[]]
         self.drone_pos: dict[int, tuple[float, float]] = {}
 

@@ -23,15 +23,15 @@ class ZoneTypes(Enum):
     PRIORITY = ("priority", 1, 1)
 
     @property
-    def name_str(self) -> str:
+    def name_str(self) -> Any:
         return self.value[0]
 
     @property
-    def cost(self) -> int:
+    def cost(self) -> Any:
         return self.value[1]
 
     @property
-    def priority(self) -> int:
+    def priority(self) -> Any:
         return self.value[2]
 
 
