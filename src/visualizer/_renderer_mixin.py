@@ -23,18 +23,10 @@ class RendererMixin:
         each frame, avoiding redundant calls for elements that never
         change at runtime.
         """
-        raw_drone: "Surface" = pygame.image.load(
-            "imgs/drone_f0.png"
-        ).convert_alpha()
-        d_size: tuple[int, int] = (
-            raw_drone.get_width() // 12,
-            raw_drone.get_height() // 12,
-        )
-
         self.drone_frames = []
         for i in range(16):
             raw = pygame.image.load(f"imgs/drone_f{i}.png").convert_alpha()
-            d_size = (raw.get_width() // 5, raw.get_height() // 5)
+            d_size = (raw.get_width() // 6, raw.get_height() // 6)
             self.drone_frames.append(pygame.transform.smoothscale(raw, d_size))
 
         self.drone_img = self.drone_frames[0]

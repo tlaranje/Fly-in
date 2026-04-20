@@ -202,16 +202,17 @@ class Manager:
             event: The pygame event to inspect.
         """
         for btn in self.menu_buttons:
-            if not btn.is_clicked(mouse, event):
-                continue
-            if btn.action_value == "START_MAP_SELECT":
-                self.state = 'MAP_SELECT'
-                self.update_display_mode(350, 500)
-                for d_btn in self.difficulty_btms:
-                    d_btn.setup_button()
-            elif btn.action_value == "QUIT_APP":
-                pygame.quit()
-                sys.exit()
+            if btn.is_clicked(mouse, event):
+                if btn.action_value == "START_MAP_SELECT":
+                    self.state = 'MAP_SELECT'
+                    self.update_display_mode(350, 500)
+                    for d_btn in self.difficulty_btms:
+                        d_btn.setup_button()
+                    pygame.event.clear()
+                    return
+                elif btn.action_value == "QUIT_APP":
+                    pygame.quit()
+                    sys.exit()
 
     def handle_map_events(
         self,
@@ -231,6 +232,7 @@ class Manager:
                 if btn.is_clicked(mouse, event):
                     self.selected_difficulty = btn.action_value
                     self.create_map_screen()
+                    pygame.event.clear()
                     return
         else:
             # Show map list for the selected tier

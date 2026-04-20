@@ -72,6 +72,20 @@ class Button:
         font: pygame.font.Font,
         mouse_pos: tuple[int, int],
     ) -> None:
+        """
+        Renders the button to the screen with dynamic visual effects.
+
+        Handles the drawing of the button's shadow, hover glow, main
+        body, border, and centered text label. Visual properties like
+        position and color adapt automatically based on mouse hover
+        and click (pressed) states.
+
+        Args:
+            screen: The pygame surface where the button will be drawn.
+            font: The font object used to render the button's label.
+            mouse_pos: The current (x, y) coordinates of the mouse cursor
+                to determine hover and click visual states.
+        """
         is_hover: bool = self.rect.collidepoint(mouse_pos)
         is_pressed: bool = is_hover and pygame.mouse.get_pressed()[0]
 
@@ -137,6 +151,6 @@ class Button:
             True when the event is a left mouse button down inside the
             button rect, False otherwise.
         """
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             return self.rect.collidepoint(mouse_pos)
         return False
