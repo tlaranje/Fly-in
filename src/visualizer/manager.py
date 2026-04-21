@@ -1,10 +1,11 @@
 from .text_renderer import TextRenderer
 from src.simulation import Simulation
+from pydantic import ValidationError
 from .visualizer import Visualizer
 from src.parsing import MapParser
 from src.dijkstra import Dijkstra
 from .button import Button
-from rich import print
+from rich import print as rprint
 import pygame
 import sys
 import os
@@ -152,17 +153,26 @@ class Manager:
             d_map = map_parser.parse(map_path)
 
             dijkstra: Dijkstra = Dijkstra(d_map)
+            if not dijkstra.is_map_solvable():
+                raise ValueError(
+                    f"Invalid map: No valid path found from "
+                    f"'{d_map.start_zone[0].name}' to "
+                    f"'{d_map.end_zone[0].name}'"
+                )
             dijkstra.solve()
 
             viz: Visualizer = Visualizer(d_map)
             sim: Simulation = Simulation(d_map, viz, dijkstra)
+            map_name = map_path.split('/')[2].split('.')[0]
 
-            sim.run()
+            sim.run(map_name)
 
+        except ValidationError as e:
+            for error in e.errors():
+                msg: str = error['msg'].removeprefix("Value error, ")
+                rprint(f"[bold red]{msg}[/bold red]")
         except Exception as e:
-            print(
-                f"[bold red]Erro ao carregar mapa {map_path}: {e}[/bold red]"
-            )
+            rprint(f"[bold red]{e}[/bold red]")
         finally:
             self.update_display_mode(*self.win_size)
             pygame.display.set_caption("Fly-in")

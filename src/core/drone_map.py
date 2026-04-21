@@ -56,7 +56,9 @@ class DroneMap(BaseModel):
         nb = values.get("nb_drones")
 
         # nb_drones must exist and be a positive integer.
-        if nb is None or not isinstance(nb, int) or nb <= 0:
+        if nb is None:
+            errors.append("'nb_drones' is not define in file map")
+        elif not isinstance(nb, int) or nb <= 0:
             errors.append("'nb_drones' must be a positive integer")
 
         drones = values.get("drones")
@@ -98,15 +100,16 @@ class DroneMap(BaseModel):
         return values
 
     @model_validator(mode="after")
-    def check_unique_names(self) -> Self:
+    def check_map(self) -> Self:
         """
         Validates cross-field consistency on the built model.
 
         Runs after Pydantic has constructed the model instance.
         Checks that zone names are unique, that start and end zones
         exist and differ, that every connection references known zones,
-        that no duplicate or self-referencing connections exist, and
-        that no zone is completely isolated from the graph.
+        that no duplicate or self-referencing connections exist, that
+        no zone is completely isolated from the graph, and that a
+        connected path exists from the start zone to the end zone.
 
         Returns:
             The validated model instance when all checks pass.

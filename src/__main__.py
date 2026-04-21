@@ -24,8 +24,10 @@ def main() -> None:
             msg: str = error['msg'].removeprefix("Value error, ")
             rprint(f"[bold red]{msg}[/bold red]")
 
-    except Exception:
-        rprint("[bold red]Erro inesperado:[/bold red]")
+    except Exception as e:
+        import traceback
+        rprint(f"[bold red]Error: {e}[/bold red]")
+        traceback.print_exc()
 
     finally:
         pygame.quit()

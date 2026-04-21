@@ -131,7 +131,7 @@ class Zone(BaseModel):
         md = values.get("max_drones", 1)
 
         # Booleans are ints in Python — exclude them explicitly.
-        if isinstance(md, bool) or not isinstance(md, int) or md <= 0:
+        if isinstance(md, bool) or not isinstance(md, int) or md < 0:
             errors.append("'max_drones' must be a positive integer")
 
         canva_id = values.get("canva_id", 0)

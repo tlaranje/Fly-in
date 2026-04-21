@@ -106,7 +106,9 @@ class MapParser:
 
         return prefix, zone
 
-    def _build_connection(self, line: str) -> Connection | None:
+    def _build_connection(
+        self, line: str, zones: dict[str, tuple[Zone, Any]]
+    ) -> Connection | None:
         """
         Parses a connection line and constructs a Connection instance.
 
@@ -126,7 +128,7 @@ class MapParser:
 
         zone1 = match.group(1)
         zone2 = match.group(2)
-        canonical_name = "-".join(sorted([zone1, zone2]))
+        conn_name = "-".join(sorted([zone1, zone2]))
         metadata = self._parse_metadata(match.group(3))
 
         optional_kwargs: dict[str, Any] = {}
@@ -137,10 +139,20 @@ class MapParser:
                 )
             }
 
+        z1, z2 = conn_name.split('-')
+        missing_zones = [z for z in [z1, z2] if z not in zones]
+
+        if missing_zones:
+            formatted_missing = ", ".join([f"'{z}'" for z in missing_zones])
+            raise ValueError(
+                f"Map Error: Connection '{conn_name}' "
+                f"references undefined zone(s): {formatted_missing}"
+            )
+
         return Connection(
             zone1=zone1,
             zone2=zone2,
-            name=canonical_name,
+            name=conn_name,
             **optional_kwargs,
         )
 
@@ -163,7 +175,7 @@ class MapParser:
             FileNotFoundError: When filepath does not exist.
         """
         d_map: dict[str, Any] = {
-            "nb_drones": 0,
+            "nb_drones": None,
             "drones": {},
             "start_zone": None,
             "end_zone": None,
@@ -194,21 +206,48 @@ class MapParser:
                     result = self._build_zone(line)
                     if result is None:
                         continue
-
                     prefix, zone = result
                     zone_entry = (zone, 0)
 
-                    # All hub types are registered in the zones dict.
+                    if zone.name in d_map["zones"]:
+                        raise ValueError(
+                            f"Duplicate zone '{zone.name}' in the file"
+                        )
+
                     d_map["zones"][zone.name] = zone_entry
 
                     if prefix == "start_hub":
+                        if d_map["start_zone"] is not None:
+                            raise ValueError(
+                                "Duplicate 'start_hub' zone in the file"
+                            )
                         d_map["start_zone"] = zone_entry
+
                     elif prefix == "end_hub":
+                        if d_map["end_zone"] is not None:
+                            raise ValueError(
+                                "Duplicate 'end_hub' zone in the file"
+                            )
                         d_map["end_zone"] = zone_entry
+
+                    if zone.max_drones == 0:
+                        if zone.name in ["start", "goal", "impossible_goal"]:
+                            raise ValueError(
+                                f"Invalid Map: Zone '{zone.name}' is a "
+                                "critical point must have max_drones > 0."
+                            )
 
                 # --- Connection declarations ---
                 elif ":" in line and line.startswith("connection"):
-                    connection = self._build_connection(line)
+                    connection = self._build_connection(line, d_map['zones'])
+                    assert connection is not None
+
+                    if connection.name in d_map["connections"]:
+                        raise ValueError(
+                            "Duplicate connection "
+                            f"'{connection.name}' in the file"
+                        )
+
                     if connection is not None:
                         d_map["connections"][connection.name] = connection
 

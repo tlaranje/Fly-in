@@ -67,7 +67,7 @@ class Connection(BaseModel):
         mlc = values.get("max_link_capacity", 1)
 
         # Capacity must be a positive integer (booleans are excluded).
-        if not isinstance(mlc, int) or isinstance(mlc, bool) or mlc <= 0:
+        if not isinstance(mlc, int) or isinstance(mlc, bool) or mlc < 0:
             errors.append(
                 "'max_link_capacity' must be a positive integer"
             )

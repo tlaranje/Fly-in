@@ -41,6 +41,30 @@ class Dijkstra:
         # Link occupancy counters: (connection_name, turn) -> drone count.
         self.link_reservations: dict[tuple[str, int], int] = {}
 
+    def is_map_solvable(self) -> bool:
+        """
+        Check if at least one valid path exists from start to end
+        ignoring other drones and reservations.
+
+        Returns:
+            bool: ``True`` when the path is solvable.
+        """
+        start_name = self.d_map.start_zone[0].name
+        end_name = self.d_map.end_zone[0].name
+
+        original_res = self.reservations.copy()
+        original_link_res = self.link_reservations.copy()
+
+        self.reservations = {}
+        self.link_reservations = {}
+
+        path = self._find_path(start_name, end_name, drone_id=-1)
+
+        self.reservations = original_res
+        self.link_reservations = original_link_res
+
+        return path is not None
+
     def _is_link_free(
         self, origin: str, destination: str, turn: int
     ) -> bool:
@@ -165,6 +189,9 @@ class Dijkstra:
             representing the full path (including *start*), or ``None``
             when no route exists.
         """
+        # Define a safety limit (e.g., total zones * some factor)
+        max_turns_allowed = len(self.d_map.zones) * 10
+
         # Initial state: zero cost, turn 0, at the start zone.
         priority_queue: list[tuple[float, int, str, list[str]]] = [
             (0, 0, start, [start])
@@ -178,6 +205,10 @@ class Dijkstra:
             accumulated_cost, current_turn, current_zone, current_path = (
                 heapq.heappop(priority_queue)
             )
+
+            # EXIT CONDITION: Prevent infinite waiting
+            if current_turn > max_turns_allowed:
+                continue
 
             # Destination reached — return the path immediately.
             if current_zone == end:

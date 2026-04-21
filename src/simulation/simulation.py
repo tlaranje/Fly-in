@@ -107,41 +107,47 @@ class Simulation:
             next_step: str = d_obj.path.pop(0)
             if next_step in self.d_map.zones:
                 # --- Move to a zone ---
-                nz, _ = self.d_map.zones[next_step]
-                d_obj.target_x = nz.x
-                d_obj.target_y = nz.y
-                d_obj.is_moving = True
-                d_obj.curr_zone = next_step
+                if next_step != d_obj.curr_zone:
+                    nz, _ = self.d_map.zones[next_step]
+                    d_obj.target_x = nz.x
+                    d_obj.target_y = nz.y
+                    d_obj.is_moving = True
+                    d_obj.curr_zone = next_step
 
-                color: str = (
-                    "blue"
-                    if nz.zone_type.name.lower() == "restricted"
-                    else "green"
-                )
-                turn_moves.append(
-                    f"[bold {color}]D{d_obj.drone_id}-"
-                    f"{next_step}[/bold {color}]"
-                )
+                    color: str = (
+                        "blue"
+                        if nz.zone_type.name.lower() == "restricted"
+                        else "green"
+                    )
+                    turn_moves.append(
+                        f"[bold {color}]D{d_obj.drone_id}-"
+                        f"{next_step}[/bold {color}]"
+                    )
 
-                # Mark drone for removal once it reaches the end zone
-                if next_step == end_name:
-                    d_obj.should_die = True
+                    # Mark drone for removal once it reaches the end zone
+                    if next_step == end_name:
+                        d_obj.should_die = True
 
             elif next_step in self.d_map.connections:
                 # --- Move to midpoint of a restricted connection ---
-                conn = self.d_map.connections[next_step]
-                z1, _ = self.d_map.zones[conn.zone1]
-                z2, _ = self.d_map.zones[conn.zone2]
+                if d_obj.curr_zone != next_step:
+                    conn = self.d_map.connections[next_step]
+                    z1, _ = self.d_map.zones[conn.zone1]
+                    z2, _ = self.d_map.zones[conn.zone2]
 
-                d_obj.target_x = (z1.x + z2.x) / 2
-                d_obj.target_y = (z1.y + z2.y) / 2
-                d_obj.is_moving = True
+                    d_obj.target_x = (z1.x + z2.x) / 2
+                    d_obj.target_y = (z1.y + z2.y) / 2
+                    d_obj.is_moving = True
 
-                clean_conn: str = "->".join(sorted(next_step.split('-')))
-                turn_moves.append(
-                    f"[bold yellow]D{d_obj.drone_id}-"
-                    f"{clean_conn}[/bold yellow]"
-                )
+                    # Update curr_zone to the connection
+                    # name to track stationary state
+                    d_obj.curr_zone = next_step
+
+                    clean_conn = "->".join(sorted(next_step.split('-')))
+                    turn_moves.append(
+                        f"[bold yellow]D{d_obj.drone_id}-"
+                        f"{clean_conn}[/bold yellow]"
+                    )
 
         return turn_moves
 
@@ -246,7 +252,7 @@ class Simulation:
 
         v.create_drones()
 
-    def run(self) -> None:
+    def run(self, map_name: str = "Fly-in") -> None:
         """
         Initializes the window and enters the main pygame event loop.
 
@@ -259,6 +265,9 @@ class Simulation:
         v: "VisualizerProtocol" = self.visualizer
         v.setup_window()
         v.setup_assets()
+
+        assert map_name is not None
+        pygame.display.set_caption(map_name)
 
         clock: pygame.time.Clock = pygame.time.Clock()
         running: bool = True
