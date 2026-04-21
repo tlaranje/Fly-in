@@ -47,9 +47,6 @@ class Dijkstra:
         """
         Check whether a connection has remaining capacity at a given turn.
 
-        The connection key is built by sorting both endpoint names so the
-        lookup is direction-independent.
-
         Args:
             origin (str): Name of the first zone endpoint.
             destination (str): Name of the second zone endpoint.
@@ -59,7 +56,6 @@ class Dijkstra:
             bool: ``True`` when the link has not yet reached its maximum
             capacity for that turn.
         """
-        # Sort endpoints to obtain the canonical connection key.
         conn_key = "-".join(sorted([origin, destination]))
         conn = self.d_map.connections.get(conn_key)
         assert conn is not None, (
@@ -100,13 +96,13 @@ class Dijkstra:
         """
         return zone_name == self.d_map.start_zone[0].name
 
-    def solve(self) -> tuple[dict[int, list[str]], int]:
+    def solve(self) -> None:
         """
-        Compute collision-free paths for every drone in the fleet.
+        Compute collision-free paths for every drone.
 
-        Iterates over all drones in fleet order.  Each drone finds the
+        Iterates over all drones in order. Each drone finds the
         shortest available path given the reservations already placed by
-        previously processed drones.  Paths are stored back onto the
+        previously processed drones. Paths are stored back onto the
         drone objects (excluding the shared start zone) and recorded in
         the returned mapping.
 
@@ -118,10 +114,9 @@ class Dijkstra:
             - The total number of turns required by the longest path
               across the entire fleet.
         """
-        fleet_paths: dict[int, list[str]] = {}
+        paths: dict[int, list[str]] = {}
         start_name = self.d_map.start_zone[0].name
         end_name = self.d_map.end_zone[0].name
-        max_turns: int = 0
 
         for drone_obj, _ in self.d_map.drones.values():
             computed_path = self._find_path(
@@ -129,23 +124,13 @@ class Dijkstra:
             )
 
             if computed_path:
-                # Store the path on the drone, excluding the start zone
-                # because the drone is already positioned there.
                 drone_obj.path = computed_path[1:]
                 self._apply_reservations(computed_path)
-                fleet_paths[drone_obj.drone_id] = computed_path
+                paths[drone_obj.drone_id] = computed_path
             else:
                 # No route found: park the drone at the start zone.
-                fleet_paths[drone_obj.drone_id] = [start_name]
+                paths[drone_obj.drone_id] = [start_name]
                 drone_obj.path = [start_name]
-
-        # Determine the overall simulation length from the longest path.
-        for recorded_path in fleet_paths.values():
-            turn_count = len(recorded_path) - 1
-            if turn_count > max_turns:
-                max_turns = turn_count
-
-        return fleet_paths, max_turns
 
     def _find_path(self, start: str, end: str, drone_id: int) -> Any:
         """
