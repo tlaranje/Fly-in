@@ -55,20 +55,24 @@ class RendererMixin:
         Resets world-space target coordinates and creates a pygame Rect
         for each drone centred on the start zone.
         """
-        start, _ = self.d_map.zones["start"]
+        start_zone_obj, _ = self.d_map.start_zone
 
-        spawn_x: float = self.sx(start.x)
-        spawn_y: float = self.sy(start.y)
+        spawn_x: float = self.sx(start_zone_obj.x)
+        spawn_y: float = self.sy(start_zone_obj.y)
 
         for d_id, d_data in self.d_map.drones.items():
             d_obj = d_data[0]
-            d_obj.curr_zone = "start"
-            d_obj.target_x = float(start.x)
-            d_obj.target_y = float(start.y)
+
+            d_obj.curr_zone = start_zone_obj.name
+
+            d_obj.target_x = float(start_zone_obj.x)
+            d_obj.target_y = float(start_zone_obj.y)
+
             rect: pygame.Rect = self.drone_img.get_rect(
                 center=(spawn_x, spawn_y)
             )
             self.d_map.drones[d_id] = (d_obj, rect)
+            start_zone_obj.count_drones += 1
 
     def get_pygame_color(
         self: VisualizerProtocol, color_str: str | None

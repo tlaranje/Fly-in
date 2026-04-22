@@ -13,10 +13,11 @@ class Connection(BaseModel):
             simultaneously. Defaults to 1.
         name: Unique identifier for this connection.
     """
+    name: str
     zone1: str
     zone2: str
     max_link_capacity: int = 1
-    name: str
+    curr_capacity: int = 0
 
     @model_validator(mode="before")
     @classmethod
@@ -66,7 +67,6 @@ class Connection(BaseModel):
 
         mlc = values.get("max_link_capacity", 1)
 
-        # Capacity must be a positive integer (booleans are excluded).
         if not isinstance(mlc, int) or isinstance(mlc, bool) or mlc < 0:
             errors.append(
                 "'max_link_capacity' must be a positive integer"

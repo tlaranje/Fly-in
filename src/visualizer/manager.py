@@ -4,8 +4,9 @@ from pydantic import ValidationError
 from .visualizer import Visualizer
 from src.parsing import MapParser
 from src.dijkstra import Dijkstra
-from .button import Button
 from rich import print as rprint
+from .button import Button
+import argparse
 import pygame
 import sys
 import os
@@ -104,7 +105,12 @@ class Manager:
             )
             for f in files:
                 # Strip numeric prefix and extension, prettify the name
-                clean_name: str = f[3:-4].replace('_', ' ').title()
+                clean_name: str = ""
+                if f[0:2].isnumeric() and f[0:3].endswith('_'):
+                    clean_name = f[3:-4].replace('_', ' ').title()
+                else:
+                    clean_name = f[:-4].replace('_', ' ').title()
+
                 full_path: str = os.path.join(folder_path, f)
                 data[state].append((clean_name, full_path))
 
@@ -149,6 +155,17 @@ class Manager:
         assert map_path is not None
 
         try:
+            parser = argparse.ArgumentParser(
+                description="Fly-in drone simulation"
+            )
+            parser.add_argument(
+                "--capacity-info",
+                action="store_true",
+                help="Display more info about capacity"
+            )
+
+            args = parser.parse_args()
+
             map_parser: MapParser = MapParser()
             d_map = map_parser.parse(map_path)
 
@@ -162,7 +179,9 @@ class Manager:
             dijkstra.solve()
 
             viz: Visualizer = Visualizer(d_map)
-            sim: Simulation = Simulation(d_map, viz, dijkstra)
+            sim: Simulation = Simulation(
+                d_map, viz, dijkstra, args.capacity_info
+            )
             map_name = map_path.split('/')[2].split('.')[0]
 
             sim.run(map_name)

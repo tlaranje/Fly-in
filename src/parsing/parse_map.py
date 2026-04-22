@@ -1,267 +1,226 @@
-from src.core import DroneMap, Zone, Connection, Drone
 from typing import Any
 import re
+from src.core import DroneMap, Zone, Connection, Drone
 
-# Matches a zone line of the form:
-#   <prefix>: <name> <x> <y> [optional metadata]
+# Matches a zone line: <prefix>: <name> <x> <y> [metadata]
 _ZONE_PATTERN = re.compile(r"""
-    ^\w+:              # line starts with a zone type prefix
-    \s+(\S+)\s+        # whitespace + zone name + whitespace
-    (-?\d+)\s+(-?\d+)  # x coordinate + whitespace + y coordinate
-    (?:                # optional metadata block
-        \s+\[          # whitespace + opening bracket
-        ([^\]]*)\]     # metadata content + closing bracket
-    )?
+    ^\w+:              # prefixo
+    \s+([^-\s]+)\s+    # nome (NÃO permite hífens)
+    (-?\d+)\s+(-?\d+)  # coordenadas x e y
+    (?:\s+(.*))?       # metadados opcionais
 """, re.VERBOSE)
 
-# Matches a connection line of the form:
-#   connection: <zone1>-<zone2> [optional metadata]
+# Matches a connection line: connection: <z1>-<z2> [metadata]
 _CONN_PATTERN = re.compile(r"""
-    ^connection:      # line starts with connection:
-    \s+([^-\s]+)-     # whitespace + first zone name + separator
-    ([^-\s]+)         # second zone name
-    (?:               # optional metadata block
-        \s+\[         # whitespace + opening bracket
-        ([^\]]*)\]    # metadata content + closing bracket
-    )?
+    ^connection:
+    \s+([^-\s]+)       # zona 1
+    -                  # separador
+    ([^-\s]+)          # zona 2
+    (?:\s+(.*))?       # metadados opcionais
 """, re.VERBOSE)
 
 
 class MapParser:
     """
     Parses a plain-text map file into a validated DroneMap instance.
-
-    The file format uses prefixed lines to declare zones and connections.
-    Lines beginning with ``#`` are treated as comments and skipped.
-
-    Supported line prefixes:
-        - ``nb_drones``: declares the total fleet size.
-        - ``start_hub``: declares the start zone.
-        - ``end_hub``: declares the end zone.
-        - ``hub``: declares an intermediate zone.
-        - ``connection``: declares a link between two zones.
+    Version 2.3: Explicit presence check for metadata defaults.
     """
 
     def _parse_metadata(self, raw_metadata: str | None) -> dict[str, Any]:
-        """
-        Parses an inline metadata string into a key-value dictionary.
-
-        Metadata appears inside square brackets as space-separated
-        ``key=value`` pairs, e.g. ``[zone=restricted max_drones=2]``.
-
-        Args:
-            raw_metadata: The raw string captured from inside the brackets,
-                or None when the metadata block is absent.
-
-        Returns:
-            A dictionary of parsed key-value pairs, or an empty dict when
-            the input is None or contains no ``=`` tokens.
-        """
-        if raw_metadata is None:
+        """Parses [key=value] pairs into a dictionary correctly."""
+        if not raw_metadata:
             return {}
 
         parsed: dict[str, Any] = {}
+        clean_text = raw_metadata.strip().replace("[", "").replace("]", "")
+        tokens = clean_text.split()
 
-        # Each token is a key=value pair; tokens without '=' are ignored.
-        for token in raw_metadata.split(" "):
-            if "=" in token:
-                key, _, value = token.partition("=")
-                parsed[key] = value
+        for token in tokens:
+            if "=" not in token:
+                raise ValueError(
+                    f"Map Error: Malformed metadata token '{token}'. "
+                    "Expected 'key=value'."
+                )
+
+            key, _, value = token.partition("=")
+            k, v = key.strip(), value.strip()
+
+            if not k or not v:
+                raise ValueError(f"Map Error: Invalid metadata pair '{token}'")
+
+            parsed[k] = v
 
         return parsed
 
     def _build_zone(self, line: str) -> tuple[str, Zone] | None:
-        """
-        Parses a hub line and constructs a Zone instance.
-
-        Handles ``start_hub``, ``end_hub`` and ``hub`` prefixes.
-
-        Args:
-            line: A single stripped line from the map file.
-
-        Returns:
-            A (prefix, Zone) tuple on success, or None when the line
-            does not match the expected zone pattern.
-        """
+        """Parses a hub line and constructs a Zone instance."""
         match = re.match(_ZONE_PATTERN, line)
         if not match:
+            parts = line.split(":")
+            prefix = parts[0].strip()
+            if prefix in ["start_hub", "end_hub", "hub"]:
+                content_parts = parts[1].strip().split()
+                if content_parts and "-" in content_parts[0]:
+                    raise ValueError(
+                        f"Map Error: Zone name '{content_parts[0]}' "
+                        "can not have '-' in the name."
+                    )
+                raise ValueError(f"Map Error: Invalid zone format: '{line}'")
             return None
 
         zone_name = match.group(1)
-        x_coord = int(match.group(2))
-        y_coord = int(match.group(3))
-        metadata = self._parse_metadata(match.group(4))
+        x_coord, y_coord = int(match.group(2)), int(match.group(3))
 
-        # Build optional keyword arguments from the metadata block.
-        optional_kwargs: dict[str, Any] = {}
-        if metadata:
-            optional_kwargs = {
-                "zone_type": metadata.get("zone", "normal"),
-                "color": metadata.get("color"),
-                "max_drones": int(metadata.get("max_drones", 1)),
-            }
+        remaining = match.group(4)
+        raw_metadata = None
+        if remaining:
+            remaining = remaining.strip()
+            if remaining.startswith("[") and remaining.endswith("]"):
+                raw_metadata = remaining[1:-1]
+            else:
+                raise ValueError(
+                    f"Map Error: Invalid metadata format in zone '{zone_name}'"
+                )
 
-        zone = Zone(name=zone_name, x=x_coord, y=y_coord, **optional_kwargs)
-        prefix = line.split(":")[0]
+        metadata = self._parse_metadata(raw_metadata)
 
-        return prefix, zone
+        # Lógica de verificação explícita para max_drones
+        if "max_drones" not in metadata:
+            max_dr = 1
+        else:
+            try:
+                max_dr = int(metadata["max_drones"])
+            except ValueError:
+                raise ValueError(
+                    f"Map Error: max_drones in '{zone_name}' must be int."
+                )
+
+        if max_dr < 1:
+            raise ValueError(
+                f"Map Error: Zone '{zone_name}' capacity must be at least 1."
+            )
+
+        zone = Zone(
+            name=zone_name, x=x_coord, y=y_coord,
+            zone_type=metadata.get("zone", "normal"),
+            color=metadata.get("color"),
+            max_drones=max_dr
+        )
+        return line.split(":")[0], zone
 
     def _build_connection(
-        self, line: str, zones: dict[str, tuple[Zone, Any]]
+        self, line: str, zones: dict[str, Any]
     ) -> Connection | None:
-        """
-        Parses a connection line and constructs a Connection instance.
-
-        The canonical connection name is the two zone names joined with
-        a hyphen in alphabetical order, e.g. ``alpha-beta``.
-
-        Args:
-            line: A single stripped line from the map file.
-
-        Returns:
-            A Connection instance on success, or None when the line does
-            not match the expected connection pattern.
-        """
+        """Parses connection: Z1-Z2."""
         match = re.match(_CONN_PATTERN, line)
         if not match:
-            return None
-
-        zone1 = match.group(1)
-        zone2 = match.group(2)
-        conn_name = "-".join(sorted([zone1, zone2]))
-        metadata = self._parse_metadata(match.group(3))
-
-        optional_kwargs: dict[str, Any] = {}
-        if metadata:
-            optional_kwargs = {
-                "max_link_capacity": int(
-                    metadata.get("max_link_capacity", 1)
+            content = line.replace("connection:", "").strip().split()[0]
+            if content.count("-") > 1:
+                raise ValueError(
+                    f"Map Error: Connection '{content}' has too many hífens."
                 )
-            }
+            raise ValueError(f"Map Error: Invalid connection format: '{line}'")
 
-        z1, z2 = conn_name.split('-')
-        missing_zones = [z for z in [z1, z2] if z not in zones]
-
-        if missing_zones:
-            formatted_missing = ", ".join([f"'{z}'" for z in missing_zones])
+        z1, z2 = match.group(1), match.group(2)
+        missing = [z for z in [z1, z2] if z not in zones]
+        if missing:
             raise ValueError(
-                f"Map Error: Connection '{conn_name}' "
-                f"references undefined zone(s): {formatted_missing}"
+                f"Map Error: Undefined zone(s) in connection: {missing}"
+            )
+
+        metadata = self._parse_metadata(match.group(3))
+        val_from_map = metadata.get("max_link_capacity")
+        if val_from_map is None:
+            max_l = 1
+        else:
+            try:
+                max_l = int(val_from_map)
+            except ValueError:
+                raise ValueError(
+                    f"Map Error: max_link_capacity in '{z1}-{z2}' must be int."
+                )
+
+        if max_l < 1:
+            raise ValueError(
+                f"Map Error: Connection '{z1}-{z2}' capacity must be >= 1."
             )
 
         return Connection(
-            zone1=zone1,
-            zone2=zone2,
-            name=conn_name,
-            **optional_kwargs,
+            zone1=z1, zone2=z2,
+            name="-".join(sorted([z1, z2])),
+            max_link_capacity=max_l
         )
 
     def parse(self, filepath: str) -> DroneMap:
-        """
-        Reads a map file and returns a fully validated DroneMap.
-
-        Each line is classified by its prefix and dispatched to the
-        appropriate builder. Zone and connection objects are collected
-        into a dictionary before the final DroneMap is assembled.
-
-        Args:
-            filepath: Path to the plain-text map file to parse.
-
-        Returns:
-            A validated DroneMap instance ready for simulation.
-
-        Raises:
-            ValueError: When the file is missing a start or end zone.
-            FileNotFoundError: When filepath does not exist.
-        """
-        d_map: dict[str, Any] = {
-            "nb_drones": None,
-            "drones": {},
-            "start_zone": None,
-            "end_zone": None,
-            "zones": {},
-            "connections": {},
+        """Main entry point for parsing the map file."""
+        dmap: dict[str, Any] = {
+            "nb_drones": None, "drones": {}, "zones": {}, "connections": {},
+            "start_zone": None, "end_zone": None
         }
+        raw_conns: list[str] = []
+        seen_coords: dict[tuple[float, float], str] = {}
 
-        with open(filepath, "r") as map_file:
-            for raw_line in map_file:
-                line = raw_line.rstrip()
-
-                # Skip blank lines and comments.
+        with open(filepath, "r") as f:
+            for raw_line in f:
+                line = raw_line.strip()
                 if not line or line.startswith("#"):
                     continue
 
-                # --- Fleet size declaration ---
-                if line.startswith("nb_drones"):
-                    fleet_size = int(line.split(":")[1].strip())
-                    d_map["nb_drones"] = fleet_size
-
-                    # Pre-populate the drone fleet with sequential IDs.
-                    for drone_index in range(fleet_size):
-                        drone_obj = Drone(drone_id=drone_index)
-                        d_map["drones"][drone_index] = (drone_obj, 0)
-
-                # --- Zone declarations ---
-                elif ":" in line and not line.startswith("connection"):
-                    result = self._build_zone(line)
-                    if result is None:
-                        continue
-                    prefix, zone = result
-                    zone_entry = (zone, 0)
-
-                    if zone.name in d_map["zones"]:
+                if line.startswith("nb_drones:"):
+                    count_str = line.split(":")[1].strip()
+                    try:
+                        count = int(count_str)
+                    except ValueError:
                         raise ValueError(
-                            f"Duplicate zone '{zone.name}' in the file"
+                            f"Map Error: '{count_str}' is not int"
                         )
 
-                    d_map["zones"][zone.name] = zone_entry
-
-                    if prefix == "start_hub":
-                        if d_map["start_zone"] is not None:
+                    if count < 1:
+                        raise ValueError("Map Error: nb_drones must be >= 1.")
+                    dmap["nb_drones"] = count
+                    dmap["drones"] = {
+                        i: (Drone(drone_id=i), 0) for i in range(count)
+                    }
+                elif line.startswith("connection:"):
+                    raw_conns.append(line)
+                elif ":" in line:
+                    res = self._build_zone(line)
+                    if res:
+                        prefix, zone = res
+                        if (zone.x, zone.y) in seen_coords:
+                            existing_zone_name = seen_coords[(zone.x, zone.y)]
                             raise ValueError(
-                                "Duplicate 'start_hub' zone in the file"
-                            )
-                        d_map["start_zone"] = zone_entry
-
-                    elif prefix == "end_hub":
-                        if d_map["end_zone"] is not None:
-                            raise ValueError(
-                                "Duplicate 'end_hub' zone in the file"
-                            )
-                        d_map["end_zone"] = zone_entry
-
-                    if zone.max_drones == 0:
-                        if zone.name in ["start", "goal", "impossible_goal"]:
-                            raise ValueError(
-                                f"Invalid Map: Zone '{zone.name}' is a "
-                                "critical point must have max_drones > 0."
+                                f"Map Error: Zones ['{existing_zone_name}', "
+                                f"'{zone.name}'] share the same coordinates "
+                                f"{(zone.x, zone.y)}."
                             )
 
-                # --- Connection declarations ---
-                elif ":" in line and line.startswith("connection"):
-                    connection = self._build_connection(line, d_map['zones'])
-                    assert connection is not None
+                        if zone.name in dmap["zones"]:
+                            raise ValueError(
+                                f"Map Error: Duplicate name detected. "
+                                f"Multiple zones share the name '{zone.name}'."
+                            )
 
-                    if connection.name in d_map["connections"]:
-                        raise ValueError(
-                            "Duplicate connection "
-                            f"'{connection.name}' in the file"
-                        )
+                        seen_coords[(zone.x, zone.y)] = zone.name
+                        dmap["zones"][zone.name] = (zone, 0)
 
-                    if connection is not None:
-                        d_map["connections"][connection.name] = connection
+                        if prefix == "start_hub":
+                            dmap["start_zone"] = (zone, 0)
+                        elif prefix == "end_hub":
+                            dmap["end_zone"] = (zone, 0)
 
-        if d_map["start_zone"] is None:
-            raise ValueError("Map file is missing a 'start_hub' declaration.")
+        if not all([dmap["nb_drones"], dmap["start_zone"], dmap["end_zone"]]):
+            raise ValueError("Map Error: Incomplete map definitions.")
 
-        if d_map["end_zone"] is None:
-            raise ValueError("Map file is missing an 'end_hub' declaration.")
+        for cl in raw_conns:
+            conn = self._build_connection(cl, dmap["zones"])
+            if conn:
+                if conn.name in dmap["connections"]:
+                    raise ValueError(f"Duplicate connection: {conn.name}")
+                dmap["connections"][conn.name] = conn
 
         return DroneMap(
-            nb_drones=d_map["nb_drones"],
-            drones=d_map["drones"],
-            start_zone=d_map["start_zone"],
-            end_zone=d_map["end_zone"],
-            zones=d_map["zones"],
-            connections=d_map["connections"],
+            nb_drones=dmap["nb_drones"], drones=dmap["drones"],
+            start_zone=dmap["start_zone"], end_zone=dmap["end_zone"],
+            zones=dmap["zones"], connections=dmap["connections"]
         )
