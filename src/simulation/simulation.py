@@ -59,44 +59,6 @@ class Simulation:
                 conn.curr_capacity, conn.max_link_capacity
             )
 
-    def animate_drone(self, drone_id: int) -> None:
-        """
-        Calculates smooth drone position for the animation frame.
-
-        Args:
-            drone_id: Unique ID of the drone to animate.
-        """
-        v: "VisualizerProtocol" = self.visualizer
-        d_data = self.d_map.drones.get(drone_id)
-        if not d_data:
-            return
-
-        d_obj, d_rect = d_data
-        dest_x: float = v.sx(d_obj.target_x)
-        dest_y: float = v.sy(d_obj.target_y)
-
-        # Initialize position if not present in history
-        if drone_id not in self.drone_pos:
-            self.drone_pos[drone_id] = (
-                float(d_rect.centerx), float(d_rect.centery)
-            )
-
-        curr_x, curr_y = self.drone_pos[drone_id]
-        dx, dy = dest_x - curr_x, dest_y - curr_y
-        distance = (dx**2 + dy**2)**0.5
-        step = 3.0
-
-        if distance <= step:
-            curr_x, curr_y = dest_x, dest_y
-            d_obj.is_moving = False
-        else:
-            curr_x += (dx / distance) * step
-            curr_y += (dy / distance) * step
-            d_obj.is_moving = True
-
-        self.drone_pos[drone_id] = (curr_x, curr_y)
-        d_rect.center = (int(curr_x), int(curr_y))
-
     def build_info(self) -> None:
         """Generates and prints the capacity table using Rich."""
         console = Console()
@@ -136,6 +98,44 @@ class Simulation:
         for line in self.turn_log:
             rprint(line)
 
+    def animate_drone(self, drone_id: int) -> None:
+        """
+        Calculates smooth drone position for the animation frame.
+
+        Args:
+            drone_id: Unique ID of the drone to animate.
+        """
+        v: "VisualizerProtocol" = self.visualizer
+        d_data = self.d_map.drones.get(drone_id)
+        if not d_data:
+            return
+
+        d_obj, d_rect = d_data
+        dest_x: float = v.sx(d_obj.target_x)
+        dest_y: float = v.sy(d_obj.target_y)
+
+        # Initialize position if not present in history
+        if drone_id not in self.drone_pos:
+            self.drone_pos[drone_id] = (
+                float(d_rect.centerx), float(d_rect.centery)
+            )
+
+        curr_x, curr_y = self.drone_pos[drone_id]
+        dx, dy = dest_x - curr_x, dest_y - curr_y
+        distance = (dx**2 + dy**2)**0.5
+        step = 3.0
+
+        if distance <= step:
+            curr_x, curr_y = dest_x, dest_y
+            d_obj.is_moving = False
+        else:
+            curr_x += (dx / distance) * step
+            curr_y += (dy / distance) * step
+            d_obj.is_moving = True
+
+        self.drone_pos[drone_id] = (curr_x, curr_y)
+        d_rect.center = (int(curr_x), int(curr_y))
+
     def move_drones(self) -> list[str]:
         """Executes one step of movement for all eligible drones.
 
@@ -154,8 +154,9 @@ class Simulation:
 
             # Decrement occupancy of current location (zone or link)
             if prev in self.d_map.zones:
-                z_obj = self.d_map.zones[prev][0]
-                z_obj.count_drones = max(0, z_obj.count_drones - 1)
+                if prev != next_step:
+                    z_obj = self.d_map.zones[prev][0]
+                    z_obj.count_drones = max(0, z_obj.count_drones - 1)
             elif prev in self.d_map.connections:
                 c_obj = self.d_map.connections[prev]
                 c_obj.curr_capacity = max(0, c_obj.curr_capacity - 1)
@@ -176,6 +177,7 @@ class Simulation:
                     )
                     if next_step == end_name:
                         d_obj.should_die = True
+
             # Move to connections
             else:
                 conn = self.d_map.connections[next_step]
