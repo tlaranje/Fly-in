@@ -63,7 +63,6 @@ The project is completely type-safe and passes mypy type checking without errors
 
 The graph implementation is custom-built without using forbidden libraries (such as `networkx`, `graphlib`, etc.). The learner should be able to explain how it works.
 
----
 
 ## 5. Parser Implementation
 
@@ -83,7 +82,6 @@ The graph implementation is custom-built without using forbidden libraries (such
 - Invalid capacity values (non-positive integers)
 - Duplicate zone names or connections
 
----
 
 ## 6. Zone & Movement Mechanics
 

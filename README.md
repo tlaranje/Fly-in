@@ -93,6 +93,91 @@ connection: tunnelB-goal
 - `max_link_capacity=<n>` — maximum simultaneous drones on a connection (default: 1)
 
 
+## Example Input and Expected Output
+
+The following walkthrough uses the **Easy Level 2 — Simple Fork** map to illustrate how the parser, pathfinder and simulation interact end-to-end.
+
+### Input map file (`maps/easy/02_simple_fork.txt`)
+
+```
+# Easy Level 2: Simple fork with two paths
+nb_drones: 3
+
+start_hub: start    0 0 [color=green]
+hub:       junction 1 0 [color=yellow max_drones=2]
+hub:       path_a   2  1 [color=blue]
+hub:       path_b   2 -1 [color=blue]
+end_hub:   goal     3 0 [color=red max_drones=3]
+
+connection: start-junction
+connection: junction-path_a
+connection: junction-path_b
+connection: path_a-goal
+connection: path_b-goal
+```
+
+**What the parser produces:**
+
+| Element | Details |
+|---------|---------|
+| Fleet | 3 drones (IDs 0, 1, 2), all spawned at `start` |
+| Zones | `start`, `junction` (cap 2), `path_a`, `path_b`, `goal` (cap 3) |
+| Connections | 5 undirected links, all with default capacity of 1 |
+
+### Pathfinding result
+
+Because `junction` only holds 2 drones at once and each connection carries 1 drone at a time, the time-expanded Dijkstra staggers departures automatically:
+
+| Drone | Computed path | Arrival turn |
+|-------|---------------|-------------|
+| D0 | `start → junction → path_a → goal` | Turn 3 |
+| D1 | `start → junction → path_a → goal` | Turn 4 |
+| D2 | `start → junction → path_a → goal` | Turn 5 |
+
+D1 waits one turn and D2 waits two turn at the start zone, because `junction` is fully reserved by D0 at turn 1 and is reserved by D1 at turn 2.
+
+### Terminal output (with `--capacity-info`)
+
+```
+┌──────────────────────────────┬──────────────────────────────┐
+│ ZONE                         │ CONNECTION                   │
+├──────────────────────────────┼──────────────────────────────┘
+│ start:    0/1 drones         │ junction->start:   0/1 cap   │
+│ junction: 2/2 drones  (full) │ junction->path_a:  1/1 cap   │
+│ path_a:   1/1 drones         │ junction->path_b:  1/1 cap   │
+│ path_b:   1/1 drones         │ goal->path_a:      0/1 cap   │
+│ goal:     0/3 drones         │ goal->path_b:      0/1 cap   │
+└──────────────────────────────┴──────────────────────────────┘
+Turn 1
+D0-junction
+
+Turn 2
+D0-path_a | D1-junction
+
+Turn 3
+D0-goal | D1-path_a | D2-junction
+
+Turn 4
+D1-goal | D2-path_a
+
+Turn 5
+D2-goal
+```
+
+### Common error cases
+
+If the map file is malformed the parser raises a descriptive `ValueError` before any simulation starts. Below are representative examples:
+
+| Bad input | Error message |
+|-----------|--------------|
+| `nb_drones: 0` | `Map Error: nb_drones must be >= 1.` |
+| Zone name `A-B` | `Map Error: Zone name 'A-B' can not have '-' in the name.` |
+| `[color=red max_drones 2` (missing `=`) | `Map Error: Malformed metadata token 'max_drones 2'. Expected 'key=value'.` |
+| Two zones at coordinates `(0, 0)` | `Map Error: Zones ['start', 'GhostZone'] share the same coordinates (0, 0).` |
+| End zone unreachable from start | `Invalid map: No valid path found from 'S' to 'E'` |
+| `max_link_capacity=0` | `Map Error: Connection 'S-E' capacity must be >= 1.` |
+
+
 ## Algorithm
 
 ### Time-expanded Dijkstra
